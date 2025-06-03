@@ -47,7 +47,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const appUser = mapFirebaseUserToAppUser(firebaseUser);
+        // When auth state changes, we might not have the customName from signup immediately
+        // Firebase displayName should be the source of truth after initial profile update.
+        const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', firebaseUser.displayName || undefined);
         setUser(appUser);
       } else {
         setUser(null);
@@ -59,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const handleAuthSuccess = (firebaseUser: FirebaseUser, constructedName?: string) => {
-    const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', constructedName); // Defaulting to 'patient' role
+    const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', constructedName || firebaseUser.displayName || undefined);
     setUser(appUser);
     router.push('/dashboard');
     toast({ title: "Action Successful", description: `Welcome, ${appUser.name}!` });
@@ -88,16 +90,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      let displayName = firstName;
-      if (middleName) displayName += ` ${middleName}`;
-      if (lastName) displayName += ` ${lastName}`;
-      else if (!middleName && !lastName && firstName) displayName = firstName; // if only first name is provided
-      else if (!firstName && lastName) displayName = lastName; // if only last name is provided, though schema requires first/last
-      else displayName = email; // Fallback if no names provided
+      // Simplified and robust displayName construction
+      // firstName and lastName are guaranteed by Zod schema to be non-empty strings.
+      // middleName is string | undefined.
+      const nameParts = [
+        firstName.trim(), 
+        middleName?.trim(), 
+        lastName.trim()
+      ].filter(Boolean); // Filter out undefined or empty strings resulting from middleName?.trim()
 
-      await updateProfile(userCredential.user, { displayName });
+      const constructedDisplayName = nameParts.join(' ');
       
-      handleAuthSuccess(userCredential.user, displayName);
+      // Fallback if somehow constructedDisplayName is empty (should not happen with schema)
+      const finalDisplayName = constructedDisplayName || userCredential.user.email || 'User';
+
+      await updateProfile(userCredential.user, { displayName: finalDisplayName });
+      
+      // Pass the constructed name to handleAuthSuccess
+      handleAuthSuccess(userCredential.user, finalDisplayName);
     } catch (error) {
       handleAuthError(error);
     } finally {
@@ -155,4 +165,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
