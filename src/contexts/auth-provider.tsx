@@ -23,6 +23,7 @@ interface AuthContextType {
   user: User | null;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string, firstName: string, middleName?: string, lastName?: string) => Promise<void>;
+  adminCreateUserWithEmail: (email: string, password: string, firstName: string, middleName: string | undefined, lastName: string, role: UserRole) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
@@ -31,12 +32,16 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const LOCAL_ADMIN_ID = 'ADMIN_LOCAL_001';
+const LOCAL_ADMIN_EMAIL = 'admin@gmail.com';
+const LOCAL_ADMIN_NAME = 'System Administrator (Local)';
+
 const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser, role: UserRole = 'patient', customName?: string): User => {
   return {
     id: firebaseUser.uid,
     name: customName || firebaseUser.displayName || firebaseUser.email || 'User',
     email: firebaseUser.email || undefined,
-    role: role, // This role is for the client-side context, DB record might have authoritative role
+    role: role,
   };
 };
 
@@ -48,9 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Attempt to fetch the role from the database for the current user
-        // This makes the client-side user object reflect the DB role if available
-        let userRole: UserRole = 'patient'; // Default
+        let userRole: UserRole = 'patient';
         let userName = firebaseUser.displayName || firebaseUser.email || 'User';
 
         const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
@@ -58,13 +61,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (patientSnapshot.exists()) {
           const patientData = patientSnapshot.val();
           userRole = patientData.role || 'patient';
-          userName = patientData.name || userName; // Prefer name from DB if available
+          userName = patientData.name || userName;
         }
         
         const appUser = mapFirebaseUserToAppUser(firebaseUser, userRole, userName);
         setUser(appUser);
       } else {
-        setUser(null);
+        // Check for local admin session if no Firebase user
+        const localAdminSession = localStorage.getItem('localAdminSession');
+        if (localAdminSession) {
+          try {
+            const adminUser = JSON.parse(localAdminSession);
+            if (adminUser.id === LOCAL_ADMIN_ID) {
+              setUser(adminUser);
+            } else {
+              setUser(null);
+              localStorage.removeItem('localAdminSession');
+            }
+          } catch (e) {
+            setUser(null);
+            localStorage.removeItem('localAdminSession');
+          }
+        } else {
+          setUser(null);
+        }
       }
       setIsLoading(false);
     });
@@ -72,39 +92,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const handleAuthSuccess = async (firebaseUser: FirebaseUser, constructedName?: string) => {
+  const handleAuthSuccess = async (firebaseUser: FirebaseUser, constructedName?: string, roleOverride?: UserRole) => {
     const finalName = constructedName || firebaseUser.displayName || firebaseUser.email || 'User';
-    
-    // Determine role for the app user context.
-    // For a fresh signup/login, we might not have the DB role yet, default to patient.
-    // onAuthStateChanged will later try to sync with DB role.
-    let appUserRole: UserRole = 'patient'; 
+    let appUserRole: UserRole = roleOverride || 'patient'; 
 
     const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
     const snapshot = await get(patientRecordRef);
 
     if (!snapshot.exists()) {
-      // Patient record doesn't exist, create it
       const patientDataForDb = {
         name: finalName,
         email: firebaseUser.email || '',
-        role: 'patient', // New users are patients by default
+        role: appUserRole, // Use provided role or default to 'patient'
         createdAt: serverTimestamp(),
       };
       await set(patientRecordRef, patientDataForDb);
-      appUserRole = 'patient';
     } else {
-      // Patient record exists, update name if different, and get current role from DB
       const existingData = snapshot.val();
-      appUserRole = existingData.role || 'patient'; // Use DB role for context
+      appUserRole = roleOverride || existingData.role || 'patient'; 
 
       const updates: any = {};
-      if (existingData.name !== finalName) {
-        updates.name = finalName;
-      }
-      if (firebaseUser.email && existingData.email !== firebaseUser.email) {
-        updates.email = firebaseUser.email;
-      }
+      if (existingData.name !== finalName) updates.name = finalName;
+      if (firebaseUser.email && existingData.email !== firebaseUser.email) updates.email = firebaseUser.email;
+      if (roleOverride && existingData.role !== roleOverride) updates.role = roleOverride;
+      
       if (Object.keys(updates).length > 0) {
         updates.updatedAt = serverTimestamp();
         await update(patientRecordRef, updates);
@@ -125,6 +136,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
+    if (email === LOCAL_ADMIN_EMAIL && password === 'admin') {
+      // Handle special local admin login
+      const adminUser: User = {
+        id: LOCAL_ADMIN_ID,
+        name: LOCAL_ADMIN_NAME,
+        email: LOCAL_ADMIN_EMAIL,
+        role: 'admin',
+      };
+      // Ensure local admin record exists in DB
+      const adminRecordRef = dbRef(database, `patients/${LOCAL_ADMIN_ID}`);
+      const snapshot = await get(adminRecordRef);
+      if (!snapshot.exists()) {
+        await set(adminRecordRef, {
+          name: adminUser.name,
+          email: adminUser.email,
+          role: 'admin',
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        // Optionally update if details changed, e.g. name
+        const currentData = snapshot.val();
+        if(currentData.name !== adminUser.name || currentData.email !== adminUser.email || currentData.role !== 'admin') {
+            await update(adminRecordRef, {
+                name: adminUser.name,
+                email: adminUser.email,
+                role: 'admin',
+                updatedAt: serverTimestamp()
+            });
+        }
+      }
+      setUser(adminUser);
+      localStorage.setItem('localAdminSession', JSON.stringify(adminUser)); // Persist local admin session
+      setIsLoading(false);
+      router.push('/dashboard');
+      toast({ title: "Admin Login Successful", description: `Welcome, ${adminUser.name}!` });
+      return;
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       await handleAuthSuccess(userCredential.user);
@@ -143,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const nameParts = [
         firstName.trim(), 
         middleName?.trim(), 
-        lastName.trim()
+        lastName?.trim() // lastName can also be optional or empty
       ].filter(Boolean); 
 
       const constructedDisplayName = nameParts.join(' ');
@@ -158,6 +207,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   }, [router]);
+
+  const adminCreateUserWithEmail = useCallback(async (email: string, password: string, firstName: string, middleName: string | undefined, lastName: string, role: UserRole) => {
+    setIsLoading(true);
+    // This function should only be callable by an admin. Consider adding role checks if not done at UI level.
+    try {
+      // Note: Firebase Admin SDK is needed to create users without signing them in.
+      // For client-side creation, this will sign in the admin temporarily as the new user,
+      // then we must sign them back in as admin. This is not ideal.
+      // A Cloud Function is the proper way to handle admin user creation.
+      // For this client-side-only example, we'll proceed with limitations:
+      const tempAuth = auth; // Use the main auth instance
+      const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+      
+      const nameParts = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean);
+      const constructedDisplayName = nameParts.join(' ');
+      const finalDisplayName = constructedDisplayName || userCredential.user.email || 'User';
+
+      await updateProfile(userCredential.user, { displayName: finalDisplayName });
+      
+      // Create DB record for the new user with the specified role
+      const patientRecordRef = dbRef(database, `patients/${userCredential.user.uid}`);
+      const patientDataForDb = {
+        name: finalDisplayName,
+        email: userCredential.user.email || '',
+        role: role, 
+        createdAt: serverTimestamp(),
+      };
+      await set(patientRecordRef, patientDataForDb);
+
+      toast({ title: "User Created", description: `${finalDisplayName} (${role}) has been created.` });
+      // IMPORTANT: The admin is now technically signed in as the new user.
+      // This is a side effect of client-side createUserWithEmailAndPassword.
+      // For a real app, an admin SDK backend function is far superior.
+      // To "fix" this on client, we would re-authenticate the admin.
+      // For now, we'll let onAuthStateChanged handle the current user. Or prompt admin to re-login.
+      // Better: If current user IS the local admin, restore local admin session.
+      if (user?.id === LOCAL_ADMIN_ID) {
+        setUser(user); // Restore local admin context
+      } else {
+         // If the admin was a Firebase admin, they might need to log out and log back in
+         // or we'd need to re-authenticate them programmatically here.
+         // For simplicity, we'll assume onAuthStateChanged will eventually reflect the admin user if they were Firebase auth'd.
+      }
+
+    } catch (error) {
+      handleAuthError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
 
   const loginWithProvider = useCallback(async (provider: GoogleAuthProvider | FacebookAuthProvider) => {
     setIsLoading(true);
@@ -192,8 +292,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
-      await signOut(auth);
-      setUser(null);
+      if (user?.id === LOCAL_ADMIN_ID) {
+        localStorage.removeItem('localAdminSession');
+        setUser(null);
+      } else {
+        await signOut(auth);
+        setUser(null); // onAuthStateChanged will also set this, but good to be explicit
+      }
       router.push('/login');
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error) {
@@ -201,11 +306,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, user]);
 
   return (
-    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, loginWithGoogle, loginWithFacebook, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, adminCreateUserWithEmail, loginWithGoogle, loginWithFacebook, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
