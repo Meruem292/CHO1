@@ -136,9 +136,9 @@ export default function PatientsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuLabel>Admin Actions</DropdownMenuLabel>
                   <DropdownMenuItem onClick={() => openEditForm(patient)}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit Patient
+                    <Edit className="mr-2 h-4 w-4" /> Edit Patient Info
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setPatientToDelete(patient)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -176,7 +176,7 @@ export default function PatientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">Manage Patients</h1>
-        {(user?.role === 'admin' || user?.role === 'doctor') && (
+        {(user?.role === 'admin') && ( // Only admin can add patients
           <Button onClick={() => { setEditingPatient(undefined); setIsFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Patient
           </Button>
@@ -228,4 +228,3 @@ export default function PatientsPage() {
     </div>
   );
 }
-
