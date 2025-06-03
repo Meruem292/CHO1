@@ -1,5 +1,6 @@
 
 import { z } from 'zod';
+import { ALL_DAYS_OF_WEEK, type DayOfWeek } from '@/types';
 
 export const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }).or(z.string().min(3, { message: "Username must be at least 3 characters."})),
@@ -49,11 +50,11 @@ export const patientFormDataSchema = z.object({
   nationality: z.string().optional().default(''),
   highestEducation: z.string().optional().default(''),
   occupation: z.string().optional().default(''),
-  monthlyIncome: z.string().optional().default(''), // Assuming string for flexibility, can be z.coerce.number()
+  monthlyIncome: z.string().optional().default(''),
   philhealthMember: z.enum(['yes', 'no']).optional(),
   philhealthNumber: z.string().optional().default(''),
-  healthFacilityMember: z.enum(['yes', 'no']).optional(), // Renamed for consistency
-  householdMember: z.enum(['yes', 'no']).optional(), // Renamed for consistency
+  healthFacilityMember: z.enum(['yes', 'no']).optional(),
+  householdMember: z.enum(['yes', 'no']).optional(),
   bloodType: z.string().optional().default(''),
   remarks: z.string().optional().default(''),
 });
@@ -68,7 +69,7 @@ export const patientSchema = z.object({
   firstName: z.string().min(1),
   middleName: z.string().optional(),
   lastName: z.string().min(1),
-  dateOfBirth: z.string().optional(), // Should align with PatientFormData
+  dateOfBirth: z.string().optional(),
   phoneNumber: z.string().min(5, { message: "Contact information is too short." }).optional(),
   municipal: z.string().min(2, "Municipal is too short").optional(),
   city: z.string().min(2, "City is too short").optional(),
@@ -116,3 +117,57 @@ export const aiSuggestionSchema = z.object({
   maternityHistory: z.string().min(10, { message: "Maternity history is required." }),
   babyHealthRecords: z.string().min(10, { message: "Baby's health records are required." }),
 });
+
+
+// Appointment System Schemas
+const timeFormatRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/; // HH:MM format
+
+export const timeSlotSchema = z.object({
+  startTime: z.string().regex(timeFormatRegex, { message: "Invalid start time format (HH:MM)." }),
+  endTime: z.string().regex(timeFormatRegex, { message: "Invalid end time format (HH:MM)." }),
+}).refine(data => data.startTime < data.endTime, {
+  message: "End time must be after start time.",
+  path: ["endTime"],
+});
+
+export const workingDaySchema = z.object({
+  dayOfWeek: z.enum(ALL_DAYS_OF_WEEK as [DayOfWeek, ...DayOfWeek[]]),
+  isEnabled: z.boolean().default(false),
+  startTime: z.string().regex(timeFormatRegex, { message: "Invalid start time format (HH:MM)." }).optional().or(z.literal('')),
+  endTime: z.string().regex(timeFormatRegex, { message: "Invalid end time format (HH:MM)." }).optional().or(z.literal('')),
+  breakTimes: z.array(timeSlotSchema).optional(),
+}).superRefine((data, ctx) => {
+  if (data.isEnabled) {
+    if (!data.startTime || !timeFormatRegex.test(data.startTime)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Start time is required when day is enabled.",
+        path: ["startTime"],
+      });
+    }
+    if (!data.endTime || !timeFormatRegex.test(data.endTime)) {
+       ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End time is required when day is enabled.",
+        path: ["endTime"],
+      });
+    }
+    if (data.startTime && data.endTime && data.startTime >= data.endTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End time must be after start time.",
+        path: ["endTime"],
+      });
+    }
+  }
+});
+
+export const doctorScheduleSchema = z.object({
+  // id: z.string().min(1, "ID is required."), // This will be the Firebase key
+  doctorId: z.string().min(1, "Doctor ID is required."),
+  workingHours: z.array(workingDaySchema).length(7, "Must have 7 working day entries."),
+  unavailableDates: z.array(z.string().date("Invalid date format for unavailable date.")).optional(),
+  defaultSlotDurationMinutes: z.coerce.number().int().positive({ message: "Slot duration must be a positive number." }).min(5, "Slot duration too short.").max(240, "Slot duration too long."),
+  noticePeriodHours: z.coerce.number().int().nonnegative({ message: "Notice period cannot be negative." }).optional(),
+});
+export type DoctorScheduleFormData = z.infer<typeof doctorScheduleSchema>;

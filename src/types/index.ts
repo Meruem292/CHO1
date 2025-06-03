@@ -89,25 +89,30 @@ export interface NavItem {
 }
 
 // Appointment System Types
+export type DayOfWeek = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+
+export const ALL_DAYS_OF_WEEK: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+
 export interface TimeSlot {
   startTime: string; // "HH:MM"
   endTime: string; // "HH:MM"
 }
 
 export interface WorkingDay {
-  dayOfWeek: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+  dayOfWeek: DayOfWeek;
+  isEnabled: boolean;
   startTime: string; // "HH:MM"
   endTime: string; // "HH:MM"
   breakTimes?: TimeSlot[];
-  slotDurationMinutes: number;
 }
 
 export interface DoctorSchedule {
-  id: string; // Corresponds to doctorId
-  doctorId: string;
-  workingHours: WorkingDay[];
+  id: string; // Corresponds to doctorId (Firebase key)
+  doctorId: string; // doctor's User.id
+  workingHours: WorkingDay[]; // Array of 7 WorkingDay objects, one for each day
   unavailableDates?: string[]; // Array of "YYYY-MM-DD"
-  customAvailableSlots?: Array<{ date: string; startTime: string; endTime: string; slotDurationMinutes?: number }>; // For one-off availability
+  customAvailableSlots?: Array<{ date: string; startTime: string; endTime: string; slotDurationMinutes?: number }>;
   defaultSlotDurationMinutes: number;
   noticePeriodHours?: number; // Min hours before appointment booking/cancellation
   createdAt?: object;
@@ -141,4 +146,11 @@ export interface Appointment {
   rescheduledToId?: string; // If this appointment was rescheduled to another
   createdAt?: object;
   updatedAt?: object;
+}
+
+// For Admin bootstrapping if used
+export interface AdminBootstrapConfig {
+  email: string;
+  password: string;
+  name?: string;
 }

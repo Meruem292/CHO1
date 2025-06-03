@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord } from '@/types';
+import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo } from 'firebase/database';
@@ -11,9 +11,6 @@ import { useAuth } from './use-auth-hook'; // To get current user for potential 
 const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
   if (!snapshot.exists()) return [];
   const data = snapshot.val();
-  // If data is null (e.g., a path exists but has no children, or it's explicitly null),
-  // or if data is not an object (though Firebase usually returns objects or null for paths),
-  // Object.keys(data) would throw.
   if (data === null || typeof data !== 'object') {
     return [];
   }
@@ -22,7 +19,7 @@ const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
 
 
 export function useMockDb() {
-  const { user } = useAuth(); // Get current user for potential rules or filtering
+  const { user } = useAuth(); 
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(true);
@@ -35,6 +32,9 @@ export function useMockDb() {
 
   const [babyRecords, setBabyRecords] = useState<BabyRecord[]>([]);
   const [babyRecordsLoading, setBabyRecordsLoading] = useState(true);
+
+  const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
+  const [doctorScheduleLoading, setDoctorScheduleLoading] = useState(true);
 
 
   // Fetch all patients
@@ -57,24 +57,16 @@ export function useMockDb() {
   const addPatient = useCallback(async (patientData: Omit<Patient, 'id'>) => {
     const newPatientRef = push(ref(database, 'patients'));
     await set(newPatientRef, { ...patientData, createdAt: serverTimestamp() });
-    // The onValue listener will update the local state.
-    // Return an optimistic ID or fetch the new patient if needed for immediate UI update.
     return { ...patientData, id: newPatientRef.key! } as Patient;
   }, []);
 
   const updatePatient = useCallback(async (id: string, updates: Partial<Omit<Patient, 'id'>>) => {
     const patientRef = ref(database, `patients/${id}`);
     await firebaseUpdate(patientRef, { ...updates, updatedAt: serverTimestamp() });
-    // onValue updates local state
   }, []);
 
   const deletePatient = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `patients/${id}`));
-    // Also delete related records - this is complex and needs careful handling of data integrity.
-    // For simplicity, we'll rely on onValue updates if an app shows aggregated data.
-    // Or, perform cascading deletes if business logic requires.
-    // For now, only patient is deleted. Cascading deletes should be handled server-side or via more specific client logic.
-    // Example: Delete associated consultations (if any)
     const consultsQuery = query(ref(database, 'consultations'), orderByChild('patientId'), equalTo(id));
     onValue(consultsQuery, (snapshot) => {
         snapshot.forEach((childSnapshot) => {
@@ -99,11 +91,6 @@ export function useMockDb() {
 
   // Consultation operations
   const getConsultationsByPatientId = useCallback((patientId: string) => {
-    // This requires fetching specific to a patientId.
-    // For simplicity, if all consultations are already loaded, filter locally.
-    // A more optimized way would be to query Firebase directly if consultations list is large.
-    // For now, filtering locally assuming all are loaded by a general listener if needed,
-    // or we need a separate useEffect for this.
     setConsultationsLoading(true);
     const consultsQuery = query(ref(database, 'consultations'), orderByChild('patientId'), equalTo(patientId));
     const unsubscribe = onValue(consultsQuery, (snapshot) => {
@@ -114,7 +101,7 @@ export function useMockDb() {
         console.error(`Error fetching consultations for patient ${patientId}:`, error);
         setConsultationsLoading(false);
     });
-    return unsubscribe; // The component using this should call this to cleanup
+    return unsubscribe; 
   }, []);
 
   const addConsultation = useCallback(async (consultationData: Omit<ConsultationRecord, 'id'>) => {
@@ -191,35 +178,45 @@ export function useMockDb() {
     await firebaseRemove(ref(database, `babyRecords/${id}`));
   }, []);
 
+  // Doctor Schedule Operations
+  const getDoctorScheduleById = useCallback((doctorId: string) => {
+    setDoctorScheduleLoading(true);
+    const scheduleRef = ref(database, `doctorSchedules/${doctorId}`);
+    const unsubscribe = onValue(scheduleRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setDoctorSchedule({ ...snapshot.val(), id: doctorId, doctorId: doctorId } as DoctorSchedule);
+      } else {
+        setDoctorSchedule(null); // No schedule found for this doctor
+      }
+      setDoctorScheduleLoading(false);
+    }, (error) => {
+      console.error(`Error fetching schedule for doctor ${doctorId}:`, error);
+      setDoctorScheduleLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const saveDoctorSchedule = useCallback(async (scheduleData: Omit<DoctorSchedule, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const scheduleRef = ref(database, `doctorSchedules/${scheduleData.doctorId}`);
+    const dataToSave: Partial<DoctorSchedule> = {
+      ...scheduleData,
+      updatedAt: serverTimestamp(),
+    };
+    // If it's a new schedule, also set createdAt
+    const snapshot = await get(scheduleRef);
+    if (!snapshot.exists()) {
+      dataToSave.createdAt = serverTimestamp();
+    }
+    await set(scheduleRef, dataToSave);
+    return { ...scheduleData, id: scheduleData.doctorId } as DoctorSchedule;
+  }, []);
+
+
   return {
-    // Patients
-    patients,
-    patientsLoading,
-    getPatients, // This can be removed if patients array is directly used
-    getPatientById, // This can be derived from patients array if needed
-    addPatient,
-    updatePatient,
-    deletePatient,
-    // Consultations
-    consultations, // State for currently loaded consultations (specific to a patient)
-    consultationsLoading,
-    getConsultationsByPatientId, // This function now initiates fetching and returns unsubscribe
-    addConsultation,
-    updateConsultation,
-    deleteConsultation,
-    // Maternity
-    maternityRecords, // State for currently loaded maternity records
-    maternityRecordsLoading,
-    getMaternityHistoryByPatientId, // Initiates fetching, returns unsubscribe
-    addMaternityRecord,
-    updateMaternityRecord,
-    deleteMaternityRecord,
-    // Baby Health
-    babyRecords, // State for currently loaded baby records
-    babyRecordsLoading,
-    getBabyRecordsByMotherId, // Initiates fetching, returns unsubscribe
-    addBabyRecord,
-    updateBabyRecord,
-    deleteBabyRecord,
+    patients, patientsLoading, getPatients, getPatientById, addPatient, updatePatient, deletePatient,
+    consultations, consultationsLoading, getConsultationsByPatientId, addConsultation, updateConsultation, deleteConsultation,
+    maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
+    babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, addBabyRecord, updateBabyRecord, deleteBabyRecord,
+    doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
   };
 }
