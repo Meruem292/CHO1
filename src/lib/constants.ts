@@ -1,5 +1,6 @@
+
 import type { NavItem, UserRole } from '@/types';
-import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCircle, UserCog } from 'lucide-react';
 
 export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];
 
@@ -15,6 +16,18 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Patients',
     icon: Users,
     roles: ['admin', 'doctor'],
+  },
+  {
+    href: '/doctors', // New Nav Item
+    label: 'Doctors',
+    icon: Stethoscope,
+    roles: ['admin'],
+  },
+  {
+    href: '/user-management',
+    label: 'User Management',
+    icon: UserCog, // Changed from UserCircle to UserCog for broader management
+    roles: ['admin'],
   },
   {
     href: '/consultations',
@@ -71,3 +84,4 @@ export const PATIENT_NAV_ITEMS: NavItem[] = [
 ];
 
 export const APP_NAME = 'City Health Office';
+
