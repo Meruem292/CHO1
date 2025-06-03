@@ -40,6 +40,8 @@ import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
+import { formatInTimeZone } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
 
 interface ResolvedPageParams {
   patientId: string;
@@ -162,7 +164,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
       header: 'Delivery Date',
       cell: ({ row }) => {
         const dateVal = row.getValue("deliveryDate") as string;
-        return dateVal ? new Date(dateVal).toLocaleDateString() : 'N/A';
+        return dateVal ? formatInTimeZone(parseISO(dateVal), 'Asia/Manila', 'PPP') : 'N/A';
       }
     },
     {

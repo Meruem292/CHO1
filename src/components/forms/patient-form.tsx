@@ -23,7 +23,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface PatientFormProps {
   patient?: Patient; // This is the Patient type from DB
@@ -149,7 +150,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                       )}
                     >
                       {field.value ? (
-                        format(new Date(field.value), "PPP")
+                        formatInTimeZone(parseISO(field.value), 'Asia/Manila', 'PPP')
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -160,7 +161,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={field.value ? new Date(field.value) : undefined}
+                    selected={field.value ? parseISO(field.value) : undefined}
                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : '')}
                     disabled={(date) =>
                       date > new Date() || date < new Date("1900-01-01")

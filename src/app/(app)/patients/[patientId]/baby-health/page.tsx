@@ -37,6 +37,8 @@ import {
 import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { formatInTimeZone } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
 
 interface ResolvedPageParams {
   patientId: string; // This is the mother's ID
@@ -144,7 +146,10 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => new Date(row.getValue("birthDate")).toLocaleDateString(),
+      cell: ({ row }) => {
+        const dateVal = row.getValue("birthDate") as string;
+        return dateVal ? formatInTimeZone(parseISO(dateVal), 'Asia/Manila', 'PPP') : 'N/A';
+      }
     },
     {
       accessorKey: 'birthWeight',

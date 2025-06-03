@@ -37,6 +37,8 @@ import {
 import { PatientForm } from '@/components/forms/patient-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { formatInTimeZone } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
 
 export default function PatientsPage() {
   const { user } = useAuth();
@@ -57,8 +59,13 @@ export default function PatientsPage() {
         await updatePatient(editingPatient.id, patientDataWithRole);
         toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
       } else {
-        await addPatient(patientDataWithRole);
-        toast({ title: "Patient Added", description: `${data.name} has been added.` });
+        // For adding new patients, the name is constructed from firstName, middleName, lastName
+        // The `addPatient` function in `useMockDb` might need adjustment or this data needs to be pre-processed
+        // to ensure `name` field is correctly populated if `useMockDb` doesn't do it.
+        // Assuming `addPatient` expects a full Patient-like object sans id.
+        const constructedName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
+        await addPatient({ ...patientDataWithRole, name: constructedName });
+        toast({ title: "Patient Added", description: `${constructedName} has been added.` });
       }
       setIsFormOpen(false);
       setEditingPatient(undefined);
@@ -104,7 +111,7 @@ export default function PatientsPage() {
       header: 'Date of Birth',
        cell: ({ row }) => {
         const dob = row.getValue("dateOfBirth") as string;
-        return dob ? new Date(dob).toLocaleDateString() : 'N/A';
+        return dob ? formatInTimeZone(parseISO(dob), 'Asia/Manila', 'PPP') : 'N/A';
        }
     },
     {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,7 +21,8 @@ import { CalendarIcon, Save } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface MaternityHistoryFormProps {
   record?: MaternityRecord;
@@ -77,7 +79,7 @@ export function MaternityHistoryForm({ record, onSubmit, onCancel }: MaternityHi
                       )}
                     >
                       {field.value ? (
-                        format(new Date(field.value), "PPP")
+                        formatInTimeZone(parseISO(field.value), 'Asia/Manila', 'PPP')
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -88,7 +90,7 @@ export function MaternityHistoryForm({ record, onSubmit, onCancel }: MaternityHi
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={field.value ? new Date(field.value) : undefined}
+                    selected={field.value ? parseISO(field.value) : undefined}
                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : '')}
                     disabled={(date) => date > new Date()}
                     initialFocus
@@ -139,4 +141,3 @@ export function MaternityHistoryForm({ record, onSubmit, onCancel }: MaternityHi
     </Form>
   );
 }
-
