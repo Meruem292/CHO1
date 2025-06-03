@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +46,9 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
   const { patientId: motherId } = params;
   const { user } = useAuth();
   const { 
-    getPatientById, // To get mother's name
+    getPatientById, 
+    babyRecords,
+    babyRecordsLoading,
     getBabyRecordsByMotherId, 
     addBabyRecord, 
     updateBabyRecord, 
@@ -53,14 +56,18 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
   } = useMockDb();
 
   const [mother, setMother] = useState<Patient | undefined>(undefined);
-  const [records, setRecordsState] = useState<BabyRecord[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<BabyRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<BabyRecord | null>(null);
 
   useEffect(() => {
-    setMother(getPatientById(motherId));
-    setRecordsState(getBabyRecordsByMotherId(motherId));
+    const fetchedMother = getPatientById(motherId); // Assumes mother (patient) data is loaded/fetched
+    setMother(fetchedMother);
+
+    const unsubscribe = getBabyRecordsByMotherId(motherId);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [motherId, getPatientById, getBabyRecordsByMotherId]);
 
 
@@ -78,18 +85,22 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
   }
 
 
-  const handleFormSubmit = (data: Omit<BabyRecord, 'id' | 'motherId'>) => {
+  const handleFormSubmit = async (data: Omit<BabyRecord, 'id' | 'motherId'>) => {
     const recordData = { ...data, motherId };
-    if (editingRecord) {
-      updateBabyRecord(editingRecord.id, recordData);
-      toast({ title: "Baby Record Updated", description: `Record for ${data.name || 'baby'} updated.` });
-    } else {
-      addBabyRecord(recordData);
-      toast({ title: "Baby Record Added", description: `New record for ${data.name || 'baby'} added.` });
+    try {
+      if (editingRecord) {
+        await updateBabyRecord(editingRecord.id, recordData);
+        toast({ title: "Baby Record Updated", description: `Record for ${data.name || 'baby'} updated.` });
+      } else {
+        await addBabyRecord(recordData);
+        toast({ title: "Baby Record Added", description: `New record for ${data.name || 'baby'} added.` });
+      }
+      setIsFormOpen(false);
+      setEditingRecord(undefined);
+    } catch (error) {
+      console.error("Error submitting baby health record:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save baby health record." });
     }
-    setRecordsState(getBabyRecordsByMotherId(motherId));
-    setIsFormOpen(false);
-    setEditingRecord(undefined);
   };
 
   const openEditForm = (record: BabyRecord) => {
@@ -97,12 +108,16 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (recordToDelete) {
-      deleteBabyRecord(recordToDelete.id);
-      toast({ title: "Baby Record Deleted", description: `Record for ${recordToDelete.name || 'baby'} deleted.` });
-      setRecordsState(getBabyRecordsByMotherId(motherId));
-      setRecordToDelete(null);
+      try {
+        await deleteBabyRecord(recordToDelete.id);
+        toast({ title: "Baby Record Deleted", description: `Record for ${recordToDelete.name || 'baby'} deleted.` });
+        setRecordToDelete(null);
+      } catch (error) {
+        console.error("Error deleting baby health record:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete baby health record." });
+      }
     }
   };
   
@@ -164,10 +179,18 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
         );
       },
     },
-  ], [user?.role]);
+  ], [user?.role, openEditForm, setRecordToDelete]);
 
+  if (!mother && babyRecordsLoading) {
+     return (
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Loading mother's data...</p>
+        </div>
+    );
+  }
   if (!mother) {
-    return <div>Loading mother's data or mother not found...</div>;
+    return <div>Mother's data not found...</div>;
   }
 
   return (
@@ -185,12 +208,20 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={records}
-        filterColumnId="name"
-        filterPlaceholder="Filter by baby's name..."
-      />
+      {babyRecordsLoading && babyRecords.length === 0 ? (
+         <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="ml-2">Loading baby records...</p>
+        </div>
+      ) : (
+        <DataTable
+            columns={columns}
+            data={babyRecords}
+            filterColumnId="name"
+            filterPlaceholder="Filter by baby's name..."
+        />
+      )}
+
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">

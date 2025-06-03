@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,8 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
   const { user } = useAuth();
   const { 
     getPatientById, 
+    maternityRecords,
+    maternityRecordsLoading,
     getMaternityHistoryByPatientId, 
     addMaternityRecord, 
     updateMaternityRecord, 
@@ -53,14 +56,18 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
   } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | undefined>(undefined);
-  const [records, setRecordsState] = useState<MaternityRecord[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaternityRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
 
   useEffect(() => {
-    setPatient(getPatientById(patientId));
-    setRecordsState(getMaternityHistoryByPatientId(patientId));
+    const fetchedPatient = getPatientById(patientId); // Assuming this is available from global patients state or fetches
+    setPatient(fetchedPatient);
+
+    const unsubscribe = getMaternityHistoryByPatientId(patientId);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [patientId, getPatientById, getMaternityHistoryByPatientId]);
 
   if (user?.role === 'patient' && user.id !== patientId) {
@@ -76,18 +83,22 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
    );
  }
 
-  const handleFormSubmit = (data: Omit<MaternityRecord, 'id' | 'patientId'>) => {
+  const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId'>) => {
     const recordData = { ...data, patientId };
-    if (editingRecord) {
-      updateMaternityRecord(editingRecord.id, recordData);
-      toast({ title: "Maternity Record Updated", description: `Pregnancy #${data.pregnancyNumber} record updated.` });
-    } else {
-      addMaternityRecord(recordData);
-      toast({ title: "Maternity Record Added", description: `Pregnancy #${data.pregnancyNumber} record added.` });
+    try {
+      if (editingRecord) {
+        await updateMaternityRecord(editingRecord.id, recordData);
+        toast({ title: "Maternity Record Updated", description: `Pregnancy #${data.pregnancyNumber} record updated.` });
+      } else {
+        await addMaternityRecord(recordData);
+        toast({ title: "Maternity Record Added", description: `Pregnancy #${data.pregnancyNumber} record added.` });
+      }
+      setIsFormOpen(false);
+      setEditingRecord(undefined);
+    } catch (error) {
+      console.error("Error submitting maternity record:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save maternity record." });
     }
-    setRecordsState(getMaternityHistoryByPatientId(patientId));
-    setIsFormOpen(false);
-    setEditingRecord(undefined);
   };
 
   const openEditForm = (record: MaternityRecord) => {
@@ -95,12 +106,16 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (recordToDelete) {
-      deleteMaternityRecord(recordToDelete.id);
-      toast({ title: "Maternity Record Deleted", description: `Pregnancy #${recordToDelete.pregnancyNumber} record deleted.` });
-      setRecordsState(getMaternityHistoryByPatientId(patientId));
-      setRecordToDelete(null);
+      try {
+        await deleteMaternityRecord(recordToDelete.id);
+        toast({ title: "Maternity Record Deleted", description: `Pregnancy #${recordToDelete.pregnancyNumber} record deleted.` });
+        setRecordToDelete(null);
+      } catch (error) {
+        console.error("Error deleting maternity record:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete maternity record." });
+      }
     }
   };
   
@@ -161,11 +176,20 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
         );
       },
     },
-  ], [user?.role]);
+  ], [user?.role, openEditForm, setRecordToDelete]);
 
-  if (!patient) {
-    return <div>Loading patient data or patient not found...</div>;
+  if (!patient && maternityRecordsLoading) {
+     return (
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Loading patient data...</p>
+        </div>
+    );
   }
+  if (!patient) {
+    return <div>Patient not found...</div>;
+  }
+
 
   return (
     <div className="space-y-6">
@@ -182,12 +206,19 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
          )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={records}
-        filterColumnId="outcome"
-        filterPlaceholder="Filter by outcome..."
-      />
+      {maternityRecordsLoading && maternityRecords.length === 0 ? (
+        <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="ml-2">Loading maternity records...</p>
+        </div>
+      ) : (
+        <DataTable
+            columns={columns}
+            data={maternityRecords}
+            filterColumnId="outcome"
+            filterPlaceholder="Filter by outcome..."
+        />
+      )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">

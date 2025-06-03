@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +37,6 @@ import {
 import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
 
 interface ConsultationsPageProps {
   params: { patientId: string };
@@ -46,7 +46,9 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
   const { patientId } = params;
   const { user } = useAuth();
   const { 
-    getPatientById, 
+    getPatientById, // This might need to fetch patient details if not already available
+    consultations,
+    consultationsLoading,
     getConsultationsByPatientId, 
     addConsultation, 
     updateConsultation, 
@@ -54,14 +56,21 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
   } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | undefined>(undefined);
-  const [consultations, setConsultationsState] = useState<ConsultationRecord[]>([]);
+  // Consultations are now directly from the hook state: `consultations`
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToDelete, setConsultationToDelete] useState<ConsultationRecord | null>(null);
 
   useEffect(() => {
-    setPatient(getPatientById(patientId));
-    setConsultationsState(getConsultationsByPatientId(patientId));
+    // Fetch patient details (assuming getPatientById from useMockDb can fetch from Firebase or local cache)
+    const fetchedPatient = getPatientById(patientId); // This needs to be async or use hook state if patients are global
+    setPatient(fetchedPatient); 
+
+    // Initiate fetching consultations for this patient
+    const unsubscribe = getConsultationsByPatientId(patientId);
+    return () => {
+      if (unsubscribe) unsubscribe(); // Cleanup subscription on component unmount
+    };
   }, [patientId, getPatientById, getConsultationsByPatientId]);
 
 
@@ -80,18 +89,23 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
   }
 
 
-  const handleFormSubmit = (data: Omit<ConsultationRecord, 'id' | 'patientId'>) => {
+  const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId'>) => {
     const consultationData = { ...data, patientId };
-    if (editingConsultation) {
-      updateConsultation(editingConsultation.id, consultationData);
-      toast({ title: "Consultation Updated", description: `Record for ${new Date(data.date).toLocaleDateString()} updated.` });
-    } else {
-      addConsultation(consultationData);
-      toast({ title: "Consultation Added", description: `New record for ${new Date(data.date).toLocaleDateString()} added.` });
+    try {
+      if (editingConsultation) {
+        await updateConsultation(editingConsultation.id, consultationData);
+        toast({ title: "Consultation Updated", description: `Record for ${new Date(data.date).toLocaleDateString()} updated.` });
+      } else {
+        await addConsultation(consultationData);
+        toast({ title: "Consultation Added", description: `New record for ${new Date(data.date).toLocaleDateString()} added.` });
+      }
+      // Data refreshes via onValue listener in the hook
+      setIsFormOpen(false);
+      setEditingConsultation(undefined);
+    } catch (error) {
+      console.error("Error submitting consultation form:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save consultation." });
     }
-    setConsultationsState(getConsultationsByPatientId(patientId));
-    setIsFormOpen(false);
-    setEditingConsultation(undefined);
   };
 
   const openEditForm = (consultation: ConsultationRecord) => {
@@ -99,12 +113,16 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (consultationToDelete) {
-      deleteConsultation(consultationToDelete.id);
-      toast({ title: "Consultation Deleted", description: `Record from ${new Date(consultationToDelete.date).toLocaleDateString()} deleted.` });
-      setConsultationsState(getConsultationsByPatientId(patientId));
-      setConsultationToDelete(null);
+      try {
+        await deleteConsultation(consultationToDelete.id);
+        toast({ title: "Consultation Deleted", description: `Record from ${new Date(consultationToDelete.date).toLocaleDateString()} deleted.` });
+        setConsultationToDelete(null);
+      } catch (error) {
+        console.error("Error deleting consultation:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete consultation." });
+      }
     }
   };
 
@@ -140,7 +158,7 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        if (user?.role === 'patient') return null; // Patients don't get action buttons on this table
+        if (user?.role === 'patient') return null;
         
         return (
           <DropdownMenu>
@@ -164,10 +182,18 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
         );
       },
     },
-  ], [user?.role]);
+  ], [user?.role, openEditForm, setConsultationToDelete]);
 
+  if (!patient && consultationsLoading) { // Check if patient details are also loading if fetched async
+    return (
+        <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Loading patient data...</p>
+        </div>
+    );
+  }
   if (!patient) {
-    return <div>Loading patient data or patient not found...</div>;
+      return <div>Patient not found.</div>
   }
 
   return (
@@ -184,13 +210,21 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
           </Button>
         )}
       </div>
+      
+      {consultationsLoading && consultations.length === 0 ? (
+        <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="ml-2">Loading consultations...</p>
+        </div>
+      ) : (
+        <DataTable
+            columns={columns}
+            data={consultations}
+            filterColumnId="date" // Filtering by date might need a date picker or specific string format
+            filterPlaceholder="Filter by notes or diagnosis..." // Adjust filter placeholder
+        />
+      )}
 
-      <DataTable
-        columns={columns}
-        data={consultations}
-        filterColumnId="date"
-        filterPlaceholder="Filter by date..."
-      />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">

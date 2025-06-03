@@ -1,13 +1,14 @@
+
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import type { Patient, UserRole } from '@/types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Eye } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Eye, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +23,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -35,7 +33,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PatientForm } from '@/components/forms/patient-form';
 import { toast } from '@/hooks/use-toast';
@@ -43,28 +40,27 @@ import Link from 'next/link';
 
 export default function PatientsPage() {
   const { user } = useAuth();
-  const { getPatients, addPatient, updatePatient, deletePatient } = useMockDb();
-  const [patients, setPatientsState] = useState<Patient[]>(getPatients());
+  const { patients, patientsLoading, addPatient, updatePatient, deletePatient } = useMockDb();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | undefined>(undefined);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
 
-
-  React.useEffect(() => {
-    setPatientsState(getPatients());
-  }, [getPatients]);
-
-  const handleFormSubmit = (data: Omit<Patient, 'id'>) => {
-    if (editingPatient) {
-      updatePatient(editingPatient.id, data);
-      toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
-    } else {
-      addPatient(data);
-      toast({ title: "Patient Added", description: `${data.name} has been added.` });
+  const handleFormSubmit = async (data: Omit<Patient, 'id'>) => {
+    try {
+      if (editingPatient) {
+        await updatePatient(editingPatient.id, data);
+        toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
+      } else {
+        await addPatient(data);
+        toast({ title: "Patient Added", description: `${data.name} has been added.` });
+      }
+      setIsFormOpen(false);
+      setEditingPatient(undefined);
+    } catch (error) {
+      console.error("Error submitting patient form:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save patient data." });
     }
-    setPatientsState(getPatients()); // Refresh local state
-    setIsFormOpen(false);
-    setEditingPatient(undefined);
   };
 
   const openEditForm = (patient: Patient) => {
@@ -72,12 +68,16 @@ export default function PatientsPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (patientToDelete) {
-      deletePatient(patientToDelete.id);
-      toast({ title: "Patient Deleted", description: `${patientToDelete.name} has been deleted.` });
-      setPatientsState(getPatients()); // Refresh local state
-      setPatientToDelete(null);
+      try {
+        await deletePatient(patientToDelete.id);
+        toast({ title: "Patient Deleted", description: `${patientToDelete.name} has been deleted.` });
+        setPatientToDelete(null);
+      } catch (error) {
+        console.error("Error deleting patient:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete patient." });
+      }
     }
   };
 
@@ -114,7 +114,7 @@ export default function PatientsPage() {
                 <Eye className="mr-2 h-4 w-4" /> View Records
               </Button>
             </Link>
-            {(user?.role === 'admin') && (
+            {(user?.role === 'admin') && ( // Only admin can edit/delete patients for now
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 p-0">
@@ -138,7 +138,7 @@ export default function PatientsPage() {
         );
       },
     },
-  ], [user?.role]);
+  ], [user?.role, openEditForm, setPatientToDelete]);
 
 
   if (user?.role === 'patient') {
@@ -146,6 +146,15 @@ export default function PatientsPage() {
       <div>
         <h1 className="text-2xl font-bold mb-4 font-headline">Access Denied</h1>
         <p>This page is for administrative staff only.</p>
+      </div>
+    );
+  }
+
+  if (patientsLoading && patients.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading patients...</p>
       </div>
     );
   }
@@ -191,7 +200,7 @@ export default function PatientsPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete the patient 
-                "{patientToDelete.name}" and all their associated records.
+                "{patientToDelete.name}" and all their associated records (consultations, maternity, baby health).
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

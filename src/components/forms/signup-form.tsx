@@ -19,10 +19,9 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { signupSchema } from '@/zod-schemas';
 import { GoogleLogo } from '@/components/icons/google-logo';
 import { FacebookLogo } from '@/components/icons/facebook-logo';
-import { toast } from '@/hooks/use-toast';
 
 export function SignupForm() {
-  const { login } = useAuth(); // Using login for mock behavior after signup
+  const { signupWithEmail, loginWithGoogle, loginWithFacebook, isLoading } = useAuth();
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -34,18 +33,16 @@ export function SignupForm() {
     },
   });
 
-  function onSubmit(data: z.infer<typeof signupSchema>) {
-    console.log('Signup form submitted:', data);
-    // Mock: Log in the user as 'patient' after successful "signup"
-    login('patient', data.fullName);
-    toast({ title: "Signup Successful", description: "Your account has been created." });
+  async function onSubmit(data: z.infer<typeof signupSchema>) {
+    await signupWithEmail(data.email, data.password, data.fullName);
   }
 
-  const handleSocialSignup = (provider: 'Google' | 'Facebook') => {
-    console.log(`Attempting to sign up with ${provider}`);
-    toast({ title: `${provider} Sign-Up`, description: `Sign-up with ${provider} is not yet implemented.` });
-    // Mock login with a default role
-    login('patient', `${provider} User`);
+  const handleSocialSignup = async (provider: 'Google' | 'Facebook') => {
+    if (provider === 'Google') {
+      await loginWithGoogle(); // Firebase handles this as a sign-in/sign-up flow
+    } else if (provider === 'Facebook') {
+      await loginWithFacebook(); // Firebase handles this as a sign-in/sign-up flow
+    }
   };
 
   return (
@@ -58,7 +55,7 @@ export function SignupForm() {
             <FormItem>
               <FormLabel>Full Name</FormLabel>
               <FormControl>
-                <Input placeholder="Juan Dela Cruz" {...field} />
+                <Input placeholder="Juan Dela Cruz" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -71,7 +68,7 @@ export function SignupForm() {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="you@example.com" {...field} />
+                <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -84,7 +81,7 @@ export function SignupForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -97,14 +94,14 @@ export function SignupForm() {
             <FormItem>
               <FormLabel>Confirm Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-          Sign Up
+        <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
+          {isLoading ? 'Signing up...' : 'Sign Up'}
         </Button>
 
         <div className="relative my-6">
@@ -121,21 +118,22 @@ export function SignupForm() {
           className="w-full"
           type="button"
           onClick={() => handleSocialSignup('Google')}
+          disabled={isLoading}
         >
           <GoogleLogo className="mr-2 h-5 w-5" />
-          Sign up with Google
+          {isLoading ? 'Processing...' : 'Sign up with Google'}
         </Button>
         <Button
           variant="outline"
           className="w-full"
           type="button"
           onClick={() => handleSocialSignup('Facebook')}
+          disabled={isLoading}
         >
           <FacebookLogo className="mr-2 h-5 w-5" />
-          Sign up with Facebook
+          {isLoading ? 'Processing...' : 'Sign up with Facebook'}
         </Button>
       </form>
     </Form>
   );
 }
-

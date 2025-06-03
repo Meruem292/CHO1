@@ -24,30 +24,32 @@ import { FacebookLogo } from '@/components/icons/facebook-logo';
 import { toast } from '@/hooks/use-toast';
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { loginWithEmail, loginWithGoogle, loginWithFacebook, isLoading } = useAuth();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      email: '', // Can be email or username, but Firebase expects email for email/pass login
       password: '',
       rememberMe: false,
     },
   });
 
-  function onSubmit(data: z.infer<typeof loginSchema>) {
-    // Mock login: using 'patient' role and email as name for now.
-    // Real implementation would involve API calls.
-    console.log('Login form submitted:', data);
-    login('patient', data.email); 
-    toast({ title: "Login Attempt", description: "Processing your login..." });
+  async function onSubmit(data: z.infer<typeof loginSchema>) {
+    // Assuming 'email' field is used for email
+    if (!data.email.includes('@')) {
+        toast({ variant: "destructive", title: "Invalid Input", description: "Please enter a valid email address for login." });
+        return;
+    }
+    await loginWithEmail(data.email, data.password);
   }
 
-  const handleSocialLogin = (provider: 'Google' | 'Facebook') => {
-    console.log(`Attempting to sign in with ${provider}`);
-    toast({ title: `${provider} Sign-In`, description: `Sign-in with ${provider} is not yet implemented.` });
-    // Mock login with a default role for social sign-ins for now
-    login('patient', `${provider} User`);
+  const handleSocialLogin = async (provider: 'Google' | 'Facebook') => {
+    if (provider === 'Google') {
+      await loginWithGoogle();
+    } else if (provider === 'Facebook') {
+      await loginWithFacebook();
+    }
   };
 
   return (
@@ -58,9 +60,9 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email or Username</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="you@example.com" {...field} />
+                <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -73,7 +75,7 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -89,6 +91,7 @@ export function LoginForm() {
                   <Checkbox
                     checked={field.value}
                     onCheckedChange={field.onChange}
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormLabel className="text-sm font-normal">
@@ -101,8 +104,8 @@ export function LoginForm() {
             Forgot password?
           </Link>
         </div>
-        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-          Login
+        <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
+          {isLoading ? 'Logging in...' : 'Login'}
         </Button>
 
         <div className="relative my-6">
@@ -119,18 +122,20 @@ export function LoginForm() {
           className="w-full"
           type="button"
           onClick={() => handleSocialLogin('Google')}
+          disabled={isLoading}
         >
           <GoogleLogo className="mr-2 h-5 w-5" />
-          Sign-In via Google
+          {isLoading ? 'Processing...' : 'Sign-In via Google'}
         </Button>
         <Button
           variant="outline"
           className="w-full"
           type="button"
           onClick={() => handleSocialLogin('Facebook')}
+          disabled={isLoading}
         >
           <FacebookLogo className="mr-2 h-5 w-5" />
-          Sign-In via Facebook
+          {isLoading ? 'Processing...' : 'Sign-In via Facebook'}
         </Button>
       </form>
     </Form>
