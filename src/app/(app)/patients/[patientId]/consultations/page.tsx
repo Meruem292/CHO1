@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, use } from 'react'; // Import `use`
 import type { ConsultationRecord, Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
@@ -38,14 +38,21 @@ import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-interface ConsultationsPageProps {
-  params: { patientId: string };
+interface ResolvedPageParams {
+  patientId: string;
 }
 
-export default function PatientConsultationsPage({ params: { patientId } }: ConsultationsPageProps) {
+interface ConsultationsPageProps {
+  params: Promise<ResolvedPageParams>; // params is a Promise
+}
+
+export default function PatientConsultationsPage({ params: paramsPromise }: ConsultationsPageProps) {
+  const actualParams = use(paramsPromise); // Unwrap the Promise
+  const { patientId } = actualParams; // Destructure from resolved params
+
   const { user } = useAuth();
   const { 
-    getPatientById, // This might need to fetch patient details if not already available
+    getPatientById, 
     consultations,
     consultationsLoading,
     getConsultationsByPatientId, 
@@ -55,25 +62,21 @@ export default function PatientConsultationsPage({ params: { patientId } }: Cons
   } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | undefined>(undefined);
-  // Consultations are now directly from the hook state: `consultations`
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToDelete, setConsultationToDelete] useState<ConsultationRecord | null>(null);
 
   useEffect(() => {
-    // Fetch patient details (assuming getPatientById from useMockDb can fetch from Firebase or local cache)
-    const fetchedPatient = getPatientById(patientId); // This needs to be async or use hook state if patients are global
+    const fetchedPatient = getPatientById(patientId); 
     setPatient(fetchedPatient); 
 
-    // Initiate fetching consultations for this patient
     const unsubscribe = getConsultationsByPatientId(patientId);
     return () => {
-      if (unsubscribe) unsubscribe(); // Cleanup subscription on component unmount
+      if (unsubscribe) unsubscribe(); 
     };
   }, [patientId, getPatientById, getConsultationsByPatientId]);
 
 
-  // Role check: Patient can only see their own records.
   if (user?.role === 'patient' && user.id !== patientId) {
      return (
       <div className="space-y-6">
@@ -98,7 +101,6 @@ export default function PatientConsultationsPage({ params: { patientId } }: Cons
         await addConsultation(consultationData);
         toast({ title: "Consultation Added", description: `New record for ${new Date(data.date).toLocaleDateString()} added.` });
       }
-      // Data refreshes via onValue listener in the hook
       setIsFormOpen(false);
       setEditingConsultation(undefined);
     } catch (error) {
@@ -183,7 +185,7 @@ export default function PatientConsultationsPage({ params: { patientId } }: Cons
     },
   ], [user?.role, openEditForm, setConsultationToDelete]);
 
-  if (!patient && consultationsLoading) { // Check if patient details are also loading if fetched async
+  if (!patient && consultationsLoading) { 
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -219,8 +221,8 @@ export default function PatientConsultationsPage({ params: { patientId } }: Cons
         <DataTable
             columns={columns}
             data={consultations}
-            filterColumnId="date" // Filtering by date might need a date picker or specific string format
-            filterPlaceholder="Filter by notes or diagnosis..." // Adjust filter placeholder
+            filterColumnId="date" 
+            filterPlaceholder="Filter by notes or diagnosis..."
         />
       )}
 
@@ -260,4 +262,3 @@ export default function PatientConsultationsPage({ params: { patientId } }: Cons
     </div>
   );
 }
-

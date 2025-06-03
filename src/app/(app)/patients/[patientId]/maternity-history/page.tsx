@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, use } from 'react'; // Import `use`
 import type { MaternityRecord, Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
@@ -38,11 +38,18 @@ import { MaternityHistoryForm } from '@/components/forms/maternity-history-form'
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-interface MaternityHistoryPageProps {
-  params: { patientId: string };
+interface ResolvedPageParams {
+  patientId: string;
 }
 
-export default function PatientMaternityHistoryPage({ params: { patientId } }: MaternityHistoryPageProps) {
+interface MaternityHistoryPageProps {
+  params: Promise<ResolvedPageParams>; // params is a Promise
+}
+
+export default function PatientMaternityHistoryPage({ params: paramsPromise }: MaternityHistoryPageProps) {
+  const actualParams = use(paramsPromise); // Unwrap the Promise
+  const { patientId } = actualParams; // Destructure from resolved params
+
   const { user } = useAuth();
   const { 
     getPatientById, 
@@ -60,7 +67,7 @@ export default function PatientMaternityHistoryPage({ params: { patientId } }: M
   const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
 
   useEffect(() => {
-    const fetchedPatient = getPatientById(patientId); // Assuming this is available from global patients state or fetches
+    const fetchedPatient = getPatientById(patientId); 
     setPatient(fetchedPatient);
 
     const unsubscribe = getMaternityHistoryByPatientId(patientId);
@@ -254,4 +261,3 @@ export default function PatientMaternityHistoryPage({ params: { patientId } }: M
     </div>
   );
 }
-

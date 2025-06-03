@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, use } from 'react'; // Import `use`
 import type { BabyRecord, Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
@@ -38,11 +38,18 @@ import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-interface BabyHealthPageProps {
-  params: { patientId: string }; // This is the mother's ID
+interface ResolvedPageParams {
+  patientId: string; // This is the mother's ID
 }
 
-export default function PatientBabyHealthPage({ params: { patientId: motherId } }: BabyHealthPageProps) {
+interface BabyHealthPageProps {
+  params: Promise<ResolvedPageParams>; // params is a Promise
+}
+
+export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHealthPageProps) {
+  const actualParams = use(paramsPromise); // Unwrap the Promise
+  const { patientId: motherId } = actualParams; // Destructure from resolved params, rename to motherId for clarity
+
   const { user } = useAuth();
   const { 
     getPatientById, 
@@ -60,7 +67,7 @@ export default function PatientBabyHealthPage({ params: { patientId: motherId } 
   const [recordToDelete, setRecordToDelete] = useState<BabyRecord | null>(null);
 
   useEffect(() => {
-    const fetchedMother = getPatientById(motherId); // Assumes mother (patient) data is loaded/fetched
+    const fetchedMother = getPatientById(motherId); 
     setMother(fetchedMother);
 
     const unsubscribe = getBabyRecordsByMotherId(motherId);
@@ -257,4 +264,3 @@ export default function PatientBabyHealthPage({ params: { patientId: motherId } 
     </div>
   );
 }
-
