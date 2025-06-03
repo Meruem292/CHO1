@@ -42,8 +42,7 @@ interface ConsultationsPageProps {
   params: { patientId: string };
 }
 
-export default function PatientConsultationsPage({ params }: ConsultationsPageProps) {
-  const { patientId } = params;
+export default function PatientConsultationsPage({ params: { patientId } }: ConsultationsPageProps) {
   const { user } = useAuth();
   const { 
     getPatientById, // This might need to fetch patient details if not already available
@@ -261,3 +260,4 @@ export default function PatientConsultationsPage({ params }: ConsultationsPagePr
     </div>
   );
 }
+

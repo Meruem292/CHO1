@@ -42,8 +42,7 @@ interface BabyHealthPageProps {
   params: { patientId: string }; // This is the mother's ID
 }
 
-export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
-  const { patientId: motherId } = params;
+export default function PatientBabyHealthPage({ params: { patientId: motherId } }: BabyHealthPageProps) {
   const { user } = useAuth();
   const { 
     getPatientById, 
@@ -258,3 +257,4 @@ export default function PatientBabyHealthPage({ params }: BabyHealthPageProps) {
     </div>
   );
 }
+

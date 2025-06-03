@@ -38,14 +38,14 @@ if (!databaseURL.startsWith('https://') || !(databaseURL.endsWith('.firebaseio.c
 }
 
 const firebaseConfig = {
-  apiKey: apiKey,
-  authDomain: authDomain,
-  projectId: projectId,
-  storageBucket: storageBucket,
-  messagingSenderId: messagingSenderId,
-  appId: appId,
-  measurementId: measurementId,
-  databaseURL: databaseURL, // Use the validated databaseURL
+  apiKey: "AIzaSyDIIvpEP2LZy9Ac_4IbaUbww3YdcaXjC4k",
+  authDomain: "cho1-26107.firebaseapp.com",
+  databaseURL: "https://cho1-26107-default-rtdb.firebaseio.com",
+  projectId: "cho1-26107",
+  storageBucket: "cho1-26107.firebasestorage.app",
+  messagingSenderId: "1024032392768",
+  appId: "1:1024032392768:web:e1c820e8dd50a4d4d081a5",
+  measurementId: "G-RJHHHVWTLC"
 };
 
 let firebaseApp: FirebaseApp;

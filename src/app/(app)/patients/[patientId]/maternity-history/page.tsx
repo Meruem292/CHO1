@@ -42,8 +42,7 @@ interface MaternityHistoryPageProps {
   params: { patientId: string };
 }
 
-export default function PatientMaternityHistoryPage({ params }: MaternityHistoryPageProps) {
-  const { patientId } = params;
+export default function PatientMaternityHistoryPage({ params: { patientId } }: MaternityHistoryPageProps) {
   const { user } = useAuth();
   const { 
     getPatientById, 
@@ -255,3 +254,4 @@ export default function PatientMaternityHistoryPage({ params }: MaternityHistory
     </div>
   );
 }
+
