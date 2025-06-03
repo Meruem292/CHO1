@@ -4,7 +4,7 @@
 import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
-import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useAuth } from './use-auth-hook'; // To get current user for potential filtering/rules
 
 // Helper to transform Firebase snapshot to array
