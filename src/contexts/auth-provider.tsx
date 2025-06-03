@@ -15,7 +15,8 @@ import {
   signInWithPopup,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase-config'; // Import Firebase auth instance
+import { auth, database } from '@/lib/firebase-config'; // Import Firebase auth and database instances
+import { ref as dbRef, set, get, update, serverTimestamp } from 'firebase/database'; // Firebase RTDB functions
 import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -35,7 +36,7 @@ const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser, role: UserRole = '
     id: firebaseUser.uid,
     name: customName || firebaseUser.displayName || firebaseUser.email || 'User',
     email: firebaseUser.email || undefined,
-    role: role, // Default role, needs a proper role management system
+    role: role, // This role is for the client-side context, DB record might have authoritative role
   };
 };
 
@@ -45,11 +46,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // When auth state changes, we might not have the customName from signup immediately
-        // Firebase displayName should be the source of truth after initial profile update.
-        const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', firebaseUser.displayName || undefined);
+        // Attempt to fetch the role from the database for the current user
+        // This makes the client-side user object reflect the DB role if available
+        let userRole: UserRole = 'patient'; // Default
+        let userName = firebaseUser.displayName || firebaseUser.email || 'User';
+
+        const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
+        const patientSnapshot = await get(patientRecordRef);
+        if (patientSnapshot.exists()) {
+          const patientData = patientSnapshot.val();
+          userRole = patientData.role || 'patient';
+          userName = patientData.name || userName; // Prefer name from DB if available
+        }
+        
+        const appUser = mapFirebaseUserToAppUser(firebaseUser, userRole, userName);
         setUser(appUser);
       } else {
         setUser(null);
@@ -60,11 +72,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const handleAuthSuccess = (firebaseUser: FirebaseUser, constructedName?: string) => {
-    const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', constructedName || firebaseUser.displayName || undefined);
-    setUser(appUser);
+  const handleAuthSuccess = async (firebaseUser: FirebaseUser, constructedName?: string) => {
+    const finalName = constructedName || firebaseUser.displayName || firebaseUser.email || 'User';
+    
+    // Determine role for the app user context.
+    // For a fresh signup/login, we might not have the DB role yet, default to patient.
+    // onAuthStateChanged will later try to sync with DB role.
+    let appUserRole: UserRole = 'patient'; 
+
+    const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
+    const snapshot = await get(patientRecordRef);
+
+    if (!snapshot.exists()) {
+      // Patient record doesn't exist, create it
+      const patientDataForDb = {
+        name: finalName,
+        email: firebaseUser.email || '',
+        role: 'patient', // New users are patients by default
+        createdAt: serverTimestamp(),
+      };
+      await set(patientRecordRef, patientDataForDb);
+      appUserRole = 'patient';
+    } else {
+      // Patient record exists, update name if different, and get current role from DB
+      const existingData = snapshot.val();
+      appUserRole = existingData.role || 'patient'; // Use DB role for context
+
+      const updates: any = {};
+      if (existingData.name !== finalName) {
+        updates.name = finalName;
+      }
+      if (firebaseUser.email && existingData.email !== firebaseUser.email) {
+        updates.email = firebaseUser.email;
+      }
+      if (Object.keys(updates).length > 0) {
+        updates.updatedAt = serverTimestamp();
+        await update(patientRecordRef, updates);
+      }
+    }
+    
+    const appUserForContext = mapFirebaseUserToAppUser(firebaseUser, appUserRole, finalName);
+    setUser(appUserForContext);
     router.push('/dashboard');
-    toast({ title: "Action Successful", description: `Welcome, ${appUser.name}!` });
+    toast({ title: "Action Successful", description: `Welcome, ${appUserForContext.name}!` });
   };
 
   const handleAuthError = (error: any) => {
@@ -77,7 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      handleAuthSuccess(userCredential.user);
+      await handleAuthSuccess(userCredential.user);
     } catch (error) {
       handleAuthError(error);
     } finally {
@@ -90,24 +140,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Simplified and robust displayName construction
-      // firstName and lastName are guaranteed by Zod schema to be non-empty strings.
-      // middleName is string | undefined.
       const nameParts = [
         firstName.trim(), 
         middleName?.trim(), 
         lastName.trim()
-      ].filter(Boolean); // Filter out undefined or empty strings resulting from middleName?.trim()
+      ].filter(Boolean); 
 
       const constructedDisplayName = nameParts.join(' ');
-      
-      // Fallback if somehow constructedDisplayName is empty (should not happen with schema)
       const finalDisplayName = constructedDisplayName || userCredential.user.email || 'User';
 
       await updateProfile(userCredential.user, { displayName: finalDisplayName });
       
-      // Pass the constructed name to handleAuthSuccess
-      handleAuthSuccess(userCredential.user, finalDisplayName);
+      await handleAuthSuccess(userCredential.user, finalDisplayName);
     } catch (error) {
       handleAuthError(error);
     } finally {
@@ -119,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, provider);
-      handleAuthSuccess(result.user);
+      await handleAuthSuccess(result.user);
     } catch (error: any) {
       if (error.code === 'auth/account-exists-with-different-credential') {
         toast({

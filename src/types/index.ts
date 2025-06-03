@@ -9,11 +9,15 @@ export interface User {
 }
 
 export interface Patient {
-  id: string;
+  id: string; // Firebase UID - this will be the key in the RTDB, added by snapshotToArray
   name: string;
-  dateOfBirth: string;
-  contact: string;
-  address: string;
+  email: string; // Email used for login/signup
+  role: UserRole; // Role of the user/patient
+  dateOfBirth?: string;
+  contact?: string;
+  address?: string;
+  createdAt?: object; // For Firebase serverTimestamp
+  updatedAt?: object; // For Firebase serverTimestamp
   // Add other patient-specific fields
 }
 
