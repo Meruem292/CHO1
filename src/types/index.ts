@@ -1,9 +1,11 @@
+
 export type UserRole = 'admin' | 'doctor' | 'patient';
 
 export interface User {
   id: string;
   name: string;
   role: UserRole;
+  email?: string; // Optional: can be added if needed for user object
 }
 
 export interface Patient {
