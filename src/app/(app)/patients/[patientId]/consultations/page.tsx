@@ -51,28 +51,28 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   const { patientId } = actualParams; // Destructure from resolved params
 
   const { user } = useAuth();
-  const { 
-    getPatientById, 
+  const {
+    getPatientById,
     consultations,
     consultationsLoading,
-    getConsultationsByPatientId, 
-    addConsultation, 
-    updateConsultation, 
-    deleteConsultation 
+    getConsultationsByPatientId,
+    addConsultation,
+    updateConsultation,
+    deleteConsultation
   } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
-  const [consultationToDelete, setConsultationToDelete] useState<ConsultationRecord | null>(null);
+  const [consultationToDelete, setConsultationToDelete] = useState<ConsultationRecord | null>(null);
 
   useEffect(() => {
-    const fetchedPatient = getPatientById(patientId); 
-    setPatient(fetchedPatient); 
+    const fetchedPatient = getPatientById(patientId);
+    setPatient(fetchedPatient);
 
     const unsubscribe = getConsultationsByPatientId(patientId);
     return () => {
-      if (unsubscribe) unsubscribe(); 
+      if (unsubscribe) unsubscribe();
     };
   }, [patientId, getPatientById, getConsultationsByPatientId]);
 
@@ -160,7 +160,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       cell: ({ row }) => {
         const consultation = row.original;
         if (user?.role === 'patient') return null;
-        
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -185,7 +185,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     },
   ], [user?.role, openEditForm, setConsultationToDelete]);
 
-  if (!patient && consultationsLoading) { 
+  if (!patient && consultationsLoading) {
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -211,7 +211,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
           </Button>
         )}
       </div>
-      
+
       {consultationsLoading && consultations.length === 0 ? (
         <div className="flex items-center justify-center h-40">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -221,7 +221,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         <DataTable
             columns={columns}
             data={consultations}
-            filterColumnId="date" 
+            filterColumnId="date"
             filterPlaceholder="Filter by notes or diagnosis..."
         />
       )}
