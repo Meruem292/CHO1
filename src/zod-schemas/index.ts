@@ -8,7 +8,9 @@ export const loginSchema = z.object({
 });
 
 export const signupSchema = z.object({
-  fullName: z.string().min(2, { message: "Full name must be at least 2 characters." }),
+  firstName: z.string().min(1, { message: "First name is required." }).max(50, { message: "First name is too long."}),
+  middleName: z.string().max(50, { message: "Middle name is too long."}).optional(),
+  lastName: z.string().min(1, { message: "Last name is required." }).max(50, { message: "Last name is too long."}),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
@@ -52,3 +54,4 @@ export const aiSuggestionSchema = z.object({
   maternityHistory: z.string().min(10, { message: "Maternity history is required." }),
   babyHealthRecords: z.string().min(10, { message: "Baby's health records are required." }),
 });
+

@@ -9,6 +9,7 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   GoogleAuthProvider,
   FacebookAuthProvider,
   signInWithPopup,
@@ -20,7 +21,7 @@ import { toast } from '@/hooks/use-toast';
 interface AuthContextType {
   user: User | null;
   loginWithEmail: (email: string, password: string) => Promise<void>;
-  signupWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
+  signupWithEmail: (email: string, password: string, firstName: string, middleName?: string, lastName?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
@@ -46,12 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // In a real app, you'd fetch the user's role from your database here
-        // For now, we'll use a default role or try to retrieve a previously set one
-        // This part is simplified for the mock.
         const appUser = mapFirebaseUserToAppUser(firebaseUser);
         setUser(appUser);
-        // Store a minimal version or flag in localStorage if needed, but Firebase handles session
       } else {
         setUser(null);
       }
@@ -61,17 +58,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const handleAuthSuccess = (firebaseUser: FirebaseUser, fullName?: string) => {
-    const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', fullName); // Defaulting to 'patient' role
+  const handleAuthSuccess = (firebaseUser: FirebaseUser, constructedName?: string) => {
+    const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', constructedName); // Defaulting to 'patient' role
     setUser(appUser);
     router.push('/dashboard');
-    toast({ title: "Login Successful", description: `Welcome, ${appUser.name}!` });
+    toast({ title: "Action Successful", description: `Welcome, ${appUser.name}!` });
   };
 
   const handleAuthError = (error: any) => {
     console.error("Firebase Auth Error:", error);
     toast({ variant: "destructive", title: "Authentication Error", description: error.message || "An unknown error occurred." });
-    setIsLoading(false); // Ensure loading is stopped on error
+    setIsLoading(false); 
   };
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
@@ -86,13 +83,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router]);
 
-  const signupWithEmail = useCallback(async (email: string, password: string, fullName: string) => {
+  const signupWithEmail = useCallback(async (email: string, password: string, firstName: string, middleName?: string, lastName?: string) => {
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // You might want to update the Firebase user's profile with the fullName here
-      // For example: await updateProfile(userCredential.user, { displayName: fullName });
-      handleAuthSuccess(userCredential.user, fullName);
+      
+      let displayName = firstName;
+      if (middleName) displayName += ` ${middleName}`;
+      if (lastName) displayName += ` ${lastName}`;
+      else if (!middleName && !lastName && firstName) displayName = firstName; // if only first name is provided
+      else if (!firstName && lastName) displayName = lastName; // if only last name is provided, though schema requires first/last
+      else displayName = email; // Fallback if no names provided
+
+      await updateProfile(userCredential.user, { displayName });
+      
+      handleAuthSuccess(userCredential.user, displayName);
     } catch (error) {
       handleAuthError(error);
     } finally {
@@ -106,7 +111,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await signInWithPopup(auth, provider);
       handleAuthSuccess(result.user);
     } catch (error: any) {
-      // Handle specific errors like account-exists-with-different-credential
       if (error.code === 'auth/account-exists-with-different-credential') {
         toast({
           variant: "destructive",
@@ -151,3 +155,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+

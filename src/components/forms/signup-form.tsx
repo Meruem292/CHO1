@@ -26,7 +26,9 @@ export function SignupForm() {
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      fullName: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -34,7 +36,7 @@ export function SignupForm() {
   });
 
   async function onSubmit(data: z.infer<typeof signupSchema>) {
-    await signupWithEmail(data.email, data.password, data.fullName);
+    await signupWithEmail(data.email, data.password, data.firstName, data.middleName, data.lastName);
   }
 
   const handleSocialSignup = async (provider: 'Google' | 'Facebook') => {
@@ -48,19 +50,47 @@ export function SignupForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="firstName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>First Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Juan" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lastName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Last Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Dela Cruz" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <FormField
-          control={form.control}
-          name="fullName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Full Name</FormLabel>
-              <FormControl>
-                <Input placeholder="Juan Dela Cruz" {...field} disabled={isLoading} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            control={form.control}
+            name="middleName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Middle Name (Optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="Santos" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         <FormField
           control={form.control}
           name="email"
@@ -137,3 +167,4 @@ export function SignupForm() {
     </Form>
   );
 }
+
