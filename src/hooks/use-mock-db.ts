@@ -11,6 +11,12 @@ import { useAuth } from './use-auth-hook'; // To get current user for potential 
 const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
   if (!snapshot.exists()) return [];
   const data = snapshot.val();
+  // If data is null (e.g., a path exists but has no children, or it's explicitly null),
+  // or if data is not an object (though Firebase usually returns objects or null for paths),
+  // Object.keys(data) would throw.
+  if (data === null || typeof data !== 'object') {
+    return [];
+  }
   return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
 };
 
