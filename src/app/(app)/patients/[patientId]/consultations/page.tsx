@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, ClipboardList } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, ClipboardList, AlertTriangle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -264,7 +264,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         <DataTable
             columns={columns}
             data={consultations}
-            filterColumnId="date" // Example: you might want to filter by notes or diagnosis
+            filterColumnId="date" 
             filterPlaceholder="Filter by notes or diagnosis..."
         />
       )}
