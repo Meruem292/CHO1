@@ -46,13 +46,19 @@ export default function PatientsPage() {
   const [editingPatient, setEditingPatient] = useState<Patient | undefined>(undefined);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
 
-  const handleFormSubmit = async (data: Omit<Patient, 'id'>) => {
+  const displayedPatients = useMemo(() => {
+    return patients.filter(p => p.role === 'patient');
+  }, [patients]);
+
+  const handleFormSubmit = async (data: Omit<Patient, 'id' | 'role'>) => {
+    // When admin adds via "Manage Patients", role should default to 'patient'
+    const patientDataWithRole: Omit<Patient, 'id'> = { ...data, role: 'patient' };
     try {
       if (editingPatient) {
-        await updatePatient(editingPatient.id, data);
+        await updatePatient(editingPatient.id, patientDataWithRole);
         toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
       } else {
-        await addPatient(data);
+        await addPatient(patientDataWithRole);
         toast({ title: "Patient Added", description: `${data.name} has been added.` });
       }
       setIsFormOpen(false);
@@ -97,11 +103,18 @@ export default function PatientsPage() {
     {
       accessorKey: 'dateOfBirth',
       header: 'Date of Birth',
-       cell: ({ row }) => new Date(row.getValue("dateOfBirth")).toLocaleDateString(),
+       cell: ({ row }) => {
+        const dob = row.getValue("dateOfBirth") as string;
+        return dob ? new Date(dob).toLocaleDateString() : 'N/A';
+       }
     },
     {
-      accessorKey: 'contact',
-      header: 'Contact',
+      accessorKey: 'email',
+      header: 'Email',
+    },
+    {
+      accessorKey: 'phoneNumber',
+      header: 'Phone Number',
     },
     {
       id: 'actions',
@@ -114,7 +127,7 @@ export default function PatientsPage() {
                 <Eye className="mr-2 h-4 w-4" /> View Records
               </Button>
             </Link>
-            {(user?.role === 'admin') && ( // Only admin can edit/delete patients for now
+            {(user?.role === 'admin') && ( 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 p-0">
@@ -138,7 +151,7 @@ export default function PatientsPage() {
         );
       },
     },
-  ], [user?.role, openEditForm, setPatientToDelete]);
+  ], [user?.role]);
 
 
   if (user?.role === 'patient') {
@@ -150,7 +163,7 @@ export default function PatientsPage() {
     );
   }
 
-  if (patientsLoading && patients.length === 0) {
+  if (patientsLoading && displayedPatients.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -172,17 +185,17 @@ export default function PatientsPage() {
 
       <DataTable
         columns={columns}
-        data={patients}
+        data={displayedPatients} // Use the filtered list
         filterColumnId="name"
         filterPlaceholder="Filter by name..."
       />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingPatient ? 'Edit Patient' : 'Add New Patient'}</DialogTitle>
             <DialogDescription>
-              {editingPatient ? `Update details for ${editingPatient.name}.` : 'Fill in the details to add a new patient.'}
+              {editingPatient ? `Update details for ${editingPatient.name}.` : 'Fill in the details to add a new patient. This will create a user with the "patient" role.'}
             </DialogDescription>
           </DialogHeader>
           <PatientForm
@@ -215,3 +228,4 @@ export default function PatientsPage() {
     </div>
   );
 }
+
