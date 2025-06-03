@@ -51,7 +51,6 @@ export default function PatientsPage() {
   }, [patients]);
 
   const handleFormSubmit = async (data: Omit<Patient, 'id' | 'role'>) => {
-    // When admin adds via "Manage Patients", role should default to 'patient'
     const patientDataWithRole: Omit<Patient, 'id'> = { ...data, role: 'patient' };
     try {
       if (editingPatient) {
@@ -191,7 +190,7 @@ export default function PatientsPage() {
       />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPatient ? 'Edit Patient' : 'Add New Patient'}</DialogTitle>
             <DialogDescription>
