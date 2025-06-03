@@ -1,14 +1,14 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, use } from 'react'; // Import `use`
+import React, { useState, useMemo, useEffect, use } from 'react';
 import type { MaternityRecord, Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2 } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, Baby, AlertTriangle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,25 +34,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MaternityHistoryForm } from '@/components/forms/maternity-history-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { database } from '@/lib/firebase-config';
+import { ref as dbRef, onValue } from 'firebase/database';
 
 interface ResolvedPageParams {
   patientId: string;
 }
 
 interface MaternityHistoryPageProps {
-  params: Promise<ResolvedPageParams>; // params is a Promise
+  params: Promise<ResolvedPageParams>;
 }
 
 export default function PatientMaternityHistoryPage({ params: paramsPromise }: MaternityHistoryPageProps) {
-  const actualParams = use(paramsPromise); // Unwrap the Promise
-  const { patientId } = actualParams; // Destructure from resolved params
+  const actualParams = use(paramsPromise);
+  const { patientId } = actualParams;
 
   const { user } = useAuth();
   const { 
-    getPatientById, 
     maternityRecords,
     maternityRecordsLoading,
     getMaternityHistoryByPatientId, 
@@ -62,19 +64,36 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
   } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | undefined>(undefined);
+  const [patientLoading, setPatientLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaternityRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
 
   useEffect(() => {
-    const fetchedPatient = getPatientById(patientId); 
-    setPatient(fetchedPatient);
+    if (patientId) {
+      setPatientLoading(true);
+      const patientRecordRef = dbRef(database, `patients/${patientId}`);
+      const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
+        if (snapshot.exists()) {
+          setPatient({ id: snapshot.key, ...snapshot.val() } as Patient);
+        } else {
+          setPatient(undefined);
+        }
+        setPatientLoading(false);
+      }, (error) => {
+        console.error("Error fetching patient data:", error);
+        setPatient(undefined);
+        setPatientLoading(false);
+      });
 
-    const unsubscribe = getMaternityHistoryByPatientId(patientId);
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [patientId, getPatientById, getMaternityHistoryByPatientId]);
+      const unsubscribeMaternity = getMaternityHistoryByPatientId(patientId);
+      
+      return () => {
+        unsubscribePatient();
+        if (unsubscribeMaternity) unsubscribeMaternity();
+      };
+    }
+  }, [patientId, getMaternityHistoryByPatientId]);
 
   if (user?.role === 'patient' && user.id !== patientId) {
     return (
@@ -184,7 +203,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     },
   ], [user?.role, openEditForm, setRecordToDelete]);
 
-  if (!patient && maternityRecordsLoading) {
+  if (patientLoading) {
      return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -192,16 +211,31 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
         </div>
     );
   }
+
   if (!patient) {
-    return <div>Patient not found...</div>;
+     return (
+      <div className="space-y-6">
+        <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back to Patients List
+        </Link>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Patient Not Found</AlertTitle>
+          <AlertDescription>
+            The patient with ID '{patientId}' could not be found. They may have been removed or the ID is incorrect.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
 
   return (
     <div className="space-y-6">
-       <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
+       <Link href={user?.role === 'patient' ? "/dashboard" : "/patients"} className="flex items-center text-sm text-primary hover:underline mb-4">
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Patients List
+          Back to {user?.role === 'patient' ? "Dashboard" : "Patients List"}
       </Link>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">Maternity History for {patient.name}</h1>
@@ -217,11 +251,20 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="ml-2">Loading maternity records...</p>
         </div>
+      ) : !maternityRecordsLoading && maternityRecords.length === 0 ? (
+        <Alert>
+            <Baby className="h-4 w-4" />
+            <AlertTitle>No Maternity History</AlertTitle>
+            <AlertDescription>
+                There are no maternity history records available for {patient.name} yet.
+                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
+            </AlertDescription>
+        </Alert>
       ) : (
         <DataTable
             columns={columns}
             data={maternityRecords}
-            filterColumnId="outcome"
+            filterColumnId="outcome" 
             filterPlaceholder="Filter by outcome..."
         />
       )}
