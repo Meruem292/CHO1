@@ -1,6 +1,7 @@
 
 'use client';
 
+import React, { useEffect } from 'react'; // Import useEffect
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
@@ -114,9 +115,17 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
     defaultValues: getInitialFormValues(patient),
   });
 
+  useEffect(() => {
+    // When the patient prop changes (e.g., when opening the dialog for a different patient),
+    // reset the form with the new patient's data.
+    form.reset(getInitialFormValues(patient));
+  }, [patient, form.reset]);
+
   const handleSubmit = (data: PatientFormData) => {
     onSubmit(data);
-    form.reset(getInitialFormValues(undefined)); // Reset with empty/default values for a new form
+    // Reset to empty form state for a potential "Add New" scenario if the form remains mounted.
+    // If dialog closes, this has minor effect as it will re-initialize on next mount anyway.
+    form.reset(getInitialFormValues(undefined));
   };
 
   return (
@@ -178,7 +187,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                     <FormItem className={fieldConfig.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
                       <FormLabel>{fieldConfig.label}</FormLabel>
                       {fieldConfig.type === 'select' ? (
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder={fieldConfig.placeholder || "Select an option"} />
@@ -192,11 +201,11 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                         </Select>
                       ) : fieldConfig.type === 'textarea' ? (
                         <FormControl>
-                          <Textarea placeholder={fieldConfig.placeholder} {...field} rows={3} />
+                          <Textarea placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} rows={3} />
                         </FormControl>
                       ) : (
                         <FormControl>
-                          <Input placeholder={fieldConfig.placeholder} {...field} />
+                          <Input placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} />
                         </FormControl>
                       )}
                       <FormMessage />
