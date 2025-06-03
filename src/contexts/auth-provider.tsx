@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           toast({
             variant: "destructive",
             title: "Account Configuration Error",
-            description: "Your account is not fully set up. Please contact support.",
+            description: "Your account is not fully set up. Please contact support or try signing up again.",
           });
           await signOut(auth); // Sign out the user
           setUser(null);
@@ -82,38 +82,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleAuthSuccess = async (firebaseUser: FirebaseUser, constructedName?: string, roleOverride?: UserRole) => {
     const finalName = constructedName || firebaseUser.displayName || firebaseUser.email || 'User';
-    let appUserRole: UserRole = roleOverride || 'patient';
+    let appUserRole: UserRole = roleOverride || 'patient'; // Default role if not overridden or found in DB
 
     const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
     const snapshot = await get(patientRecordRef);
 
     if (!snapshot.exists()) {
-      const patientDataForDb = {
+      // Record doesn't exist, create it
+      const patientDataForDb: any = {
         name: finalName,
         email: firebaseUser.email || '',
-        role: appUserRole,
+        role: appUserRole, // Use the determined role (could be 'patient' or an override like 'admin')
         createdAt: serverTimestamp(),
       };
+      // Ensure individual name parts are also stored if available from signup
+      if (constructedName) {
+          const nameParts = constructedName.split(' ');
+          patientDataForDb.firstName = nameParts[0] || '';
+          patientDataForDb.lastName = nameParts.length > 1 ? nameParts[nameParts.length -1] : '';
+          if (nameParts.length > 2) {
+            patientDataForDb.middleName = nameParts.slice(1, -1).join(' ');
+          }
+      }
+
       await set(patientRecordRef, patientDataForDb);
+      toast({ title: "Account Setup Complete", description: `Database record created for ${finalName}.` });
     } else {
+      // Record exists, update it if necessary
       const existingData = snapshot.val();
-      appUserRole = roleOverride || existingData.role || 'patient';
+      appUserRole = roleOverride || existingData.role || 'patient'; // Prioritize override, then existing DB role
 
       const updates: any = {};
       if (finalName && existingData.name !== finalName) updates.name = finalName;
       if (firebaseUser.email && existingData.email !== firebaseUser.email) updates.email = firebaseUser.email;
-      if (roleOverride && existingData.role !== roleOverride) updates.role = roleOverride;
+      if (appUserRole && existingData.role !== appUserRole) updates.role = appUserRole;
       
+      // Update name parts if they were part of constructedName and differ or missing
+      if (constructedName) {
+        const nameParts = constructedName.split(' ');
+        const newFirstName = nameParts[0] || '';
+        const newLastName = nameParts.length > 1 ? nameParts[nameParts.length -1] : '';
+        const newMiddleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : (existingData.middleName || '');
+
+        if (existingData.firstName !== newFirstName) updates.firstName = newFirstName;
+        if (existingData.lastName !== newLastName) updates.lastName = newLastName;
+        if (existingData.middleName !== newMiddleName) updates.middleName = newMiddleName;
+      }
+
+
       if (Object.keys(updates).length > 0) {
         updates.updatedAt = serverTimestamp();
         await update(patientRecordRef, updates);
+        toast({ title: "Account Updated", description: `Database record for ${finalName} updated.` });
       }
     }
     
     const appUserForContext = mapFirebaseUserToAppUser(firebaseUser, appUserRole, finalName);
     setUser(appUserForContext);
     router.push('/dashboard');
-    toast({ title: "Action Successful", description: `Welcome, ${appUserForContext.name}!` });
+    toast({ title: "Login Successful", description: `Welcome, ${appUserForContext.name}!` });
   };
 
   const handleAuthError = (error: any) => {
@@ -161,7 +188,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       await updateProfile(userCredential.user, { displayName: finalDisplayName });
       
-      await handleAuthSuccess(userCredential.user, finalDisplayName, 'patient'); // New users are patients by default
+      // Pass 'patient' role explicitly for new signups
+      await handleAuthSuccess(userCredential.user, finalDisplayName, 'patient');
     } catch (error) {
       handleAuthError(error);
     } finally {
@@ -171,9 +199,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const adminCreateUserWithEmail = useCallback(async (email: string, password: string, firstName: string, middleName: string | undefined, lastName: string, role: UserRole) => {
     setIsLoading(true);
+    // This creates a temporary auth instance problem if not handled properly.
+    // Best to use Admin SDK for this. For client-side, it will sign in as the new user.
     try {
-      const tempAuth = auth; 
-      const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
       const nameParts = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean);
       const constructedDisplayName = nameParts.join(' ');
@@ -181,39 +210,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       await updateProfile(userCredential.user, { displayName: finalDisplayName });
       
-      const patientRecordRef = dbRef(database, `patients/${userCredential.user.uid}`);
-      const patientDataForDb = {
-        name: finalDisplayName,
-        email: userCredential.user.email || '',
-        role: role, 
-        createdAt: serverTimestamp(),
-      };
-      await set(patientRecordRef, patientDataForDb);
+      // Pass the intended role explicitly when admin creates a user
+      await handleAuthSuccess(userCredential.user, finalDisplayName, role);
 
       toast({ title: "User Created", description: `${finalDisplayName} (${role}) has been created.` });
       
-      // Important: Admin is now signed in as the new user.
-      // For a real app, an admin SDK backend function is far superior.
-      // For now, we inform the admin. They might need to re-login or we'd need a mechanism to restore their session.
       if (user?.role === 'admin') {
          toast({ title: "Session Changed", description: "You are now signed in as the new user. Please log out and log back in as admin if needed."});
-         // The onAuthStateChanged will update the current user context.
       }
-
 
     } catch (error) {
       handleAuthError(error);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, router]); // Added router to dependency array
 
 
   const loginWithProvider = useCallback(async (provider: GoogleAuthProvider | FacebookAuthProvider) => {
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, provider);
-      await handleAuthSuccess(result.user, undefined, 'patient'); // Social logins default to 'patient' role
+      // Social logins also default to 'patient' role unless DB says otherwise or roleOverride is used
+      await handleAuthSuccess(result.user, undefined, 'patient'); 
     } catch (error: any) {
       if (error.code === 'auth/account-exists-with-different-credential') {
         toast({
@@ -227,7 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router]); // Added router to dependency array
 
   const loginWithGoogle = useCallback(() => {
     const provider = new GoogleAuthProvider();
@@ -256,65 +275,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const bootstrapAdminUser = useCallback(async (config: AdminBootstrapConfig) => {
     setIsLoading(true);
     try {
-      // Check if admin already exists in Auth
-      // Note: Checking existence client-side before creation is tricky without Admin SDK.
-      // Firebase signInWithEmailAndPassword throws specific errors if user not found,
-      // but createUserWithEmailAndPassword throws if email is already in use.
-      // We'll attempt creation and let Firebase handle existing user errors.
-
       const userCredential = await createUserWithEmailAndPassword(auth, config.email, config.password);
       const adminFirebaseUser = userCredential.user;
 
       const adminName = config.name || "Administrator";
       await updateProfile(adminFirebaseUser, { displayName: adminName });
-
-      const adminRecordRef = dbRef(database, `patients/${adminFirebaseUser.uid}`);
-      await set(adminRecordRef, {
-        name: adminName,
-        email: adminFirebaseUser.email,
-        role: 'admin', // Explicitly set role to admin
-        createdAt: serverTimestamp(),
-      });
-
-      // handleAuthSuccess will now sign in this new admin user.
+      
+      // Explicitly pass 'admin' role for bootstrapping
       await handleAuthSuccess(adminFirebaseUser, adminName, 'admin');
       toast({ title: "Admin User Bootstrapped", description: `Admin ${adminName} created/verified and logged in.` });
 
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
-        toast({ variant: "default", title: "Admin Exists", description: "Admin email already exists in Firebase Auth. Attempting to verify database record." });
-        // If auth user exists, try to ensure DB record is correct or log them in.
-        // This part is tricky without knowing the UID if creation failed.
-        // Best to manually ensure DB record is correct if this happens, or try logging in directly.
-        // For simplicity, we'll just inform the user.
+        toast({ variant: "default", title: "Admin Exists", description: "Admin email already exists. Attempting to login and verify DB record." });
          try {
             const userCredential = await signInWithEmailAndPassword(auth, config.email, config.password);
-            const patientRecordRef = dbRef(database, `patients/${userCredential.user.uid}`);
-            const snapshot = await get(patientRecordRef);
-            if (snapshot.exists() && snapshot.val().role === 'admin') {
-                await handleAuthSuccess(userCredential.user, snapshot.val().name, 'admin');
-                toast({ title: "Admin Verified", description: "Admin account verified and logged in."});
-            } else {
-                 await set(patientRecordRef, {
-                    name: config.name || "Administrator",
-                    email: config.email,
-                    role: 'admin',
-                    updatedAt: serverTimestamp(),
-                 });
-                await handleAuthSuccess(userCredential.user, config.name || "Administrator", 'admin');
-                toast({ title: "Admin Record Updated", description: "Admin database record updated/created. Logged in."});
-            }
+            // On successful login, handleAuthSuccess will verify/update DB
+            await handleAuthSuccess(userCredential.user, config.name || "Administrator", 'admin');
+            toast({ title: "Admin Verified", description: "Admin account verified and logged in."});
         } catch (loginError) {
-             handleAuthError(loginError); // Handle login failure
+             handleAuthError(loginError); 
         }
-
       } else {
-        handleAuthError(error); // Handle other creation errors
+        handleAuthError(error); 
       }
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router]); // Added router to dependency array
 
 
   return (
