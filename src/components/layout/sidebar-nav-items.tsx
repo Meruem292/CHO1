@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -16,19 +17,28 @@ export function SidebarNavItems() {
 
   if (!user) return null;
 
-  const patientId = params.patientId as string | undefined;
+  const patientIdFromUrl = params.patientId as string | undefined;
 
-  const itemsToRender = patientId ? PATIENT_NAV_ITEMS : NAV_ITEMS;
+  let itemsToRender: NavItem[];
+
+  if (patientIdFromUrl && (user.role === 'admin' || user.role === 'doctor')) {
+    // Admin or Doctor is viewing a specific patient's records
+    itemsToRender = PATIENT_NAV_ITEMS;
+  } else {
+    // Either on a general page, or a Patient is viewing their own records (patientIdFromUrl might be user.id)
+    itemsToRender = NAV_ITEMS;
+  }
 
   const getHref = (item: NavItem) => {
-    if (patientId && item.patientSpecific) {
-      return `/patients/${patientId}${item.href}`;
+    // For PATIENT_NAV_ITEMS (admin/doctor viewing specific patient)
+    if (patientIdFromUrl && item.patientSpecific && (user.role === 'admin' || user.role === 'doctor')) {
+      return `/patients/${patientIdFromUrl}${item.href}`;
     }
+    // For NAV_ITEMS when user is a patient (links to their own records)
     if (user.role === 'patient' && item.patientSpecific) {
-      // For patients, their own records are under /patients/[their_own_id]/...
-      // This mock assumes user.id is the patientId for a patient user.
       return `/patients/${user.id}${item.href}`;
     }
+    // Default for general NAV_ITEMS or non-patientSpecific items
     return item.href;
   };
 
@@ -39,15 +49,19 @@ export function SidebarNavItems() {
           .filter(item => item.roles.includes(user.role))
           .map((item) => {
             const href = getHref(item);
-            const isActive = pathname === href || (href !== '/' && pathname.startsWith(href + '/'));
+            const isActive = pathname === href || (href !== '/' && pathname.startsWith(href + '/') && href.length > 1);
+            // Ensure dashboard ('/') active state is handled correctly and doesn't match all other routes
+            const isDashboardActive = href === '/' && pathname === '/';
+            const finalIsActive = href === '/' ? isDashboardActive : isActive;
+
             return (
-              <SidebarMenuItem key={item.href}>
+              <SidebarMenuItem key={item.label + item.href}> {/* Ensure key is unique, combining label and original href */}
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive}
+                  isActive={finalIsActive}
                   className={cn(
                     'w-full justify-start',
-                    isActive && 'bg-primary/10 text-primary hover:bg-primary/20'
+                    finalIsActive && 'bg-primary/10 text-primary hover:bg-primary/20'
                   )}
                   tooltip={item.label}
                 >
