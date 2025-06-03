@@ -27,6 +27,7 @@ export const adminCreateUserSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   role: z.enum(['doctor', 'patient'], { message: "Role is required." }),
 });
+export type AdminCreateUserFormData = z.infer<typeof adminCreateUserSchema>;
 
 
 export const patientFormDataSchema = z.object({

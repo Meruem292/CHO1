@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, UserCog, Loader2, ShieldAlert, Stethoscope } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, UserCog, Loader2, ShieldAlert } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,12 +33,12 @@ import { toast } from '@/hooks/use-toast';
 import { UserFormDialog } from '@/components/dialogs/user-form-dialog';
 import { EditUserRoleDialog } from '@/components/dialogs/edit-user-role-dialog';
 
-export default function DoctorsPage() {
+export default function UserManagementPage() {
   const { user, adminCreateUserWithEmail } = useAuth(); // Get adminCreateUserWithEmail
   const { 
     patients: allUsers, 
     patientsLoading: usersLoading, 
-    // addPatient is no longer directly used for user creation.
+    // addPatient is no longer directly used for user creation here. adminCreateUserWithEmail handles it.
     updatePatient: updateUser,
     deletePatient: deleteUser 
   } = useMockDb();
@@ -48,9 +48,8 @@ export default function DoctorsPage() {
   const [editingUser, setEditingUser] = useState<Patient | undefined>(undefined);
   const [userToDelete, setUserToDelete] = useState<Patient | null>(null);
 
-  const doctorUsers = useMemo(() => {
-    return allUsers.filter(u => u.role === 'doctor');
-  }, [allUsers]);
+  // No filtering by role needed, show all users
+  const displayedUsers = useMemo(() => allUsers, [allUsers]);
 
   const handleAddUserSubmit = async (data: AdminCreateUserFormData) => {
     try {
@@ -61,13 +60,13 @@ export default function DoctorsPage() {
         data.firstName, 
         data.middleName, 
         data.lastName, 
-        data.role // role from form, should ideally be 'doctor' if adding from this page
+        data.role
       );
-      // adminCreateUserWithEmail in AuthProvider should handle success toasts.
+      // adminCreateUserWithEmail in AuthProvider should handle success toasts and potential navigation.
       // It will also sign the admin in as the new user, and a toast warns about this.
-      setIsAddUserFormOpen(false);
+      setIsAddUserFormOpen(false); // Close the dialog
     } catch (error) {
-      console.error("Error adding user from DoctorsPage:", error);
+      console.error("Error adding user from UserManagementPage:", error);
       // Error toasts are handled by adminCreateUserWithEmail or handleAuthError in AuthProvider
     }
   };
@@ -100,8 +99,8 @@ export default function DoctorsPage() {
             setUserToDelete(null);
             return;
         }
-        await deleteUser(userToDelete.id);
-        toast({ title: "User Deleted", description: `${userToDelete.name} has been removed from the system.` });
+        await deleteUser(userToDelete.id); // This deletes from RTDB and related records
+        toast({ title: "User Removed", description: `${userToDelete.name} has been removed from the application's database. Their Firebase Authentication record may still exist.` });
         setUserToDelete(null);
       } catch (error) {
         console.error("Error deleting user:", error);
@@ -143,9 +142,8 @@ export default function DoctorsPage() {
       id: 'actions',
       cell: ({ row }) => {
         const targetUser = row.original;
-        // Admins cannot edit other admins or themselves from this specific "Doctors" management page.
-        // They can only manage users with 'doctor' role here.
-        if (user?.role !== 'admin' || targetUser.role === 'admin' || targetUser.id === user.id) { 
+        if (user?.role !== 'admin' || targetUser.id === user.id || targetUser.role === 'admin') {
+          // Admins cannot edit themselves or other admins via this interface
           return null;
         }
         return (
@@ -163,14 +161,14 @@ export default function DoctorsPage() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setUserToDelete(targetUser)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete Doctor
+                <Trash2 className="mr-2 h-4 w-4" /> Delete User
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
     },
-  ], [user?.role, user?.id, allUsers]);
+  ], [user?.role, user?.id, allUsers]); // Added user.id to dependencies for self-edit check
 
   if (user?.role !== 'admin') {
     return (
@@ -186,11 +184,11 @@ export default function DoctorsPage() {
     );
   }
   
-  if (usersLoading && doctorUsers.length === 0) {
+  if (usersLoading && displayedUsers.length === 0) {
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading doctors list...</p>
+            <p className="ml-2">Loading users list...</p>
         </div>
     );
   }
@@ -199,27 +197,27 @@ export default function DoctorsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline flex items-center">
-          <Stethoscope className="mr-3 h-8 w-8 text-primary" /> Manage Doctors
+          <UserCog className="mr-3 h-8 w-8 text-primary" /> User Management
         </h1>
         <Button onClick={() => setIsAddUserFormOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add User
         </Button>
       </div>
 
-      {doctorUsers.length === 0 && !usersLoading ? (
+      {displayedUsers.length === 0 && !usersLoading ? (
         <Alert>
-          <Stethoscope className="h-4 w-4" />
-          <AlertTitle>No Doctors Found</AlertTitle>
+          <UserCog className="h-4 w-4" />
+          <AlertTitle>No Users Found</AlertTitle>
           <AlertDescription>
-            There are no users with the 'doctor' role in the system yet. You can add one using the "Add User" button.
+            There are no users in the system yet. You can add one using the "Add User" button.
           </AlertDescription>
         </Alert>
       ) : (
         <DataTable
             columns={columns}
-            data={doctorUsers}
-            filterColumnId="name"
-            filterPlaceholder="Filter by name or email..."
+            data={displayedUsers}
+            filterColumnId="name" // Can also filter by 'email' or 'role' if needed
+            filterPlaceholder="Filter by name, email, or role..."
         />
       )}
       
@@ -228,7 +226,7 @@ export default function DoctorsPage() {
         isOpen={isAddUserFormOpen}
         onClose={() => setIsAddUserFormOpen(false)}
         onSubmit={handleAddUserSubmit}
-        defaultRole="doctor" // Default to 'doctor' when adding from this page
+        // defaultRole could be set to 'doctor' if this page primarily manages doctors
       />
 
       {editingUser && (
@@ -237,7 +235,7 @@ export default function DoctorsPage() {
             onClose={() => { setIsEditRoleFormOpen(false); setEditingUser(undefined);}}
             user={editingUser}
             onSave={handleEditRoleSubmit}
-            allowedRoles={['doctor', 'patient']} // Doctors can be changed to patient, or remain doctor
+            allowedRoles={['doctor', 'patient']} // Admins can change users to 'doctor' or 'patient'
         />
       )}
       
@@ -249,8 +247,8 @@ export default function DoctorsPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will remove "{userToDelete.name}" ({userToDelete.role}) 
-                from the application's database. Their Firebase Authentication record might remain. 
-                Associated records (consultations, etc.) will also be deleted.
+                from the application's database and their associated health records. 
+                Their Firebase Authentication record might remain.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

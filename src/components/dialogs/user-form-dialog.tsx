@@ -4,9 +4,8 @@
 import React, { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import type * as z from 'zod';
-import type { Patient, UserRole } from '@/types'; // Patient type for submit data, UserRole for role enum
-import { adminCreateUserSchema } from '@/zod-schemas';
+import type { UserRole } from '@/types';
+import { adminCreateUserSchema, type AdminCreateUserFormData } from '@/zod-schemas';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -32,22 +31,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useAuth } from '@/hooks/use-auth-hook'; // To use adminCreateUserWithEmail
-import { toast } from '@/hooks/use-toast';
 
 
 interface UserFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Patient, 'id'>) => Promise<void>; // Omit 'id' as it's generated
-  defaultRole?: UserRole; // Optional default role pre-selection
+  onSubmit: (data: AdminCreateUserFormData) => Promise<void>; // Changed to AdminCreateUserFormData
+  defaultRole?: UserRole;
 }
 
-type AdminCreateUserFormData = z.infer<typeof adminCreateUserSchema>;
 
 export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patient' }: UserFormDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const { adminCreateUserWithEmail } = useAuth(); // Using this directly for now
 
   const form = useForm<AdminCreateUserFormData>({
     resolver: zodResolver(adminCreateUserSchema),
@@ -61,7 +56,6 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
     },
   });
 
-  // Reset form when dialog opens with a new defaultRole or simply re-opens
   React.useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -79,30 +73,13 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
   const handleFormSubmit = async (data: AdminCreateUserFormData) => {
     setIsSaving(true);
     try {
-      // Construct the full name for the Patient object
-      const fullNameParts = [data.firstName, data.middleName, data.lastName].filter(Boolean);
-      const name = fullNameParts.join(' ');
-      
-      const patientData: Omit<Patient, 'id'> = {
-        name: name,
-        firstName: data.firstName,
-        middleName: data.middleName || undefined, // Store as undefined if empty
-        lastName: data.lastName,
-        email: data.email,
-        role: data.role,
-        // password is not part of Patient type, it's used for auth creation
-      };
-      await onSubmit(patientData); // This is the prop from parent, which calls addPatient
-      // The parent (DoctorsPage or UserManagementPage) will show success toast and close.
-      // The adminCreateUserWithEmail logic is now inside AuthProvider.
-      // The `onSubmit` from parent (e.g., UserManagementPage) calls `addUser` from `useMockDb`
-      // which in turn calls `adminCreateUserWithEmail` or a similar Firebase function.
-      // For `UserFormDialog` itself, we only need to pass data to the `onSubmit` prop.
-      
-      onClose(); // Close dialog after successful submission
+      await onSubmit(data); // Pass the full AdminCreateUserFormData
+      // Parent component's onSubmit (which calls adminCreateUserWithEmail) will handle toasts.
+      // It may also handle closing the dialog or navigating, so onClose here might be conditional.
+      onClose(); // Close dialog after successful submission by parent
     } catch (error) {
-      console.error("Error submitting user form:", error);
-      // Error toast will be handled by the parent component's submit handler
+      console.error("Error submitting user form in dialog:", error);
+      // Error toast likely handled by parent or adminCreateUserWithEmail
     } finally {
       setIsSaving(false);
     }
@@ -209,7 +186,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
               <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || !form.formState.isValid}>
                 {isSaving ? 'Creating User...' : 'Create User'}
               </Button>
             </DialogFooter>
