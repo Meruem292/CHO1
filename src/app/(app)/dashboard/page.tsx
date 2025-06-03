@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth-hook";
 import { useMockDb } from "@/hooks/use-mock-db"; // This now uses Firebase
 import { Users, ClipboardList, Baby, HeartPulse, Loader2 } from "lucide-react";
 import Link from "next/link";
+import type { Patient } from '@/types';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -57,7 +58,7 @@ export default function DashboardPage() {
   }, [user?.role, consultations, consultationsLoading, maternityRecords, maternityRecordsLoading, babyRecords, babyRecordsLoading]);
 
 
-  const totalPatients = user?.role !== 'patient' ? patients.length : 0;
+  const totalPatients = user?.role !== 'patient' ? patients.filter((p: Patient) => p.role === 'patient').length : 0;
   
   const isLoadingOverall = patientsLoading || (user?.role === 'patient' && isPatientDataLoading);
 
