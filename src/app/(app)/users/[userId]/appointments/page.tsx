@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock, Eye } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,6 @@ import { ref as dbRef, onValue } from 'firebase/database';
 import { format, parseISO, isFuture } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import * as dateFnsTz from 'date-fns-tz';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -36,8 +35,6 @@ function formatInPHTime_Combined(dateString: string): string {
   if (!dateString) return "Invalid Date";
   try {
     const d = parseISO(dateString);
-    // Use dateFnsTz.formatInTimeZone if it was intended for specific timezone formatting beyond simple display
-    // For now, assuming parseISO gives UTC and we want to display in PH time using browser's Intl
     const datePart = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
     const timePart = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true }).format(d);
     return `${datePart} at ${timePart}`;
@@ -188,22 +185,33 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         if (!appointment || !appointment.appointmentDateTimeStart) {
           return null;
         }
-        if (!canManageThisAppointment(appointment) || appointment.status !== 'scheduled' || !isFuture(parseISO(appointment.appointmentDateTimeStart))) {
-          return null;
-        }
+        
+        const showCancelButton = canManageThisAppointment(appointment) && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
+        const showViewPatientRecordsButton = (currentUser?.role === 'admin' || (currentUser?.role === 'doctor' && currentUser.id === viewingUserId)) && viewingUser?.role === 'doctor' && appointment.patientId;
+
         return (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive/90 border-destructive/50 hover:border-destructive/90" onClick={() => setAppointmentToCancel(appointment)}>
-                <CalendarX2 className="mr-2 h-4 w-4" /> Cancel
-              </Button>
-            </AlertDialogTrigger>
-            {/* AlertDialogContent is now part of the main layout below to handle one active dialog */}
-          </AlertDialog>
+          <div className="flex space-x-2">
+            {showViewPatientRecordsButton && (
+              <Link href={`/patients/${appointment.patientId}/consultations`}>
+                <Button variant="outline" size="sm">
+                  <Eye className="mr-2 h-4 w-4" /> Patient Records
+                </Button>
+              </Link>
+            )}
+            {showCancelButton && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive/90 border-destructive/50 hover:border-destructive/90" onClick={() => setAppointmentToCancel(appointment)}>
+                    <CalendarX2 className="mr-2 h-4 w-4" /> Cancel
+                  </Button>
+                </AlertDialogTrigger>
+              </AlertDialog>
+            )}
+          </div>
         );
       },
     },
-  ], [viewingUser?.role, currentUser, setAppointmentToCancel, canManageThisAppointment]);
+  ], [viewingUser?.role, currentUser, viewingUserId]);
 
   if (viewingUserLoading || (viewingUser && appointmentsLoading && userSpecificAppointments.length === 0 && !viewingUser)) {
     return (

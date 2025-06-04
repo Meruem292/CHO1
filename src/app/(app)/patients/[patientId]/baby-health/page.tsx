@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
-import type { BabyRecord, Patient } from '@/types';
+import type { BabyRecord, Patient, Appointment } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2 } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, HeartPulse, ShieldAlert, AlertTriangle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,18 +34,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { parseISO } from 'date-fns';
+import { database } from '@/lib/firebase-config';
+import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_PPP(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  if (!date) return 'N/A';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  } catch (e) {
+    return 'Invalid Date';
+  }
 }
 
+const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  if (data === null || typeof data !== 'object') return [];
+  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
+};
 
 interface ResolvedPageParams {
   patientId: string; 
@@ -61,7 +75,6 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
 
   const { user } = useAuth();
   const { 
-    getPatientById, 
     babyRecords,
     babyRecordsLoading,
     getBabyRecordsByMotherId, 
@@ -71,33 +84,75 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
   } = useMockDb();
 
   const [mother, setMother] = useState<Patient | undefined>(undefined);
+  const [motherLoading, setMotherLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<BabyRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<BabyRecord | null>(null);
 
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isAccessChecking, setIsAccessChecking] = useState(true);
+
+
   useEffect(() => {
-    const fetchedMother = getPatientById(motherId); 
-    setMother(fetchedMother);
+    if (motherId) {
+      setMotherLoading(true);
+      const motherRecordRef = dbRef(database, `patients/${motherId}`);
+      const unsubscribeMother = onValue(motherRecordRef, (snapshot) => {
+        if (snapshot.exists()) {
+          setMother({ id: snapshot.key!, ...snapshot.val() } as Patient);
+        } else {
+          setMother(undefined);
+        }
+        setMotherLoading(false);
+      }, (error) => {
+        console.error("Error fetching mother's data:", error);
+        setMother(undefined);
+        setMotherLoading(false);
+      });
+      
+      const unsubscribeBabyRecords = getBabyRecordsByMotherId(motherId);
+      return () => {
+        unsubscribeMother();
+        if (unsubscribeBabyRecords) unsubscribeBabyRecords();
+      };
+    }
+  }, [motherId, getBabyRecordsByMotherId]);
 
-    const unsubscribe = getBabyRecordsByMotherId(motherId);
+  useEffect(() => {
+    let unsubAppointments: (() => void) | undefined;
+    if (!user || !motherId) {
+      setIsAccessChecking(false);
+      setHasAccess(false);
+      return;
+    }
+
+    if (user.role === 'admin') {
+      setHasAccess(true);
+      setIsAccessChecking(false);
+    } else if (user.role === 'patient') {
+      setHasAccess(user.id === motherId); // Patient can only see their own baby's records
+      setIsAccessChecking(false);
+    } else if (user.role === 'doctor') {
+      setIsAccessChecking(true);
+      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
+      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
+        const appointments = snapshotToArray<Appointment>(snapshot);
+        const foundAppointment = appointments.some(app => app.patientId === motherId); // Check if doctor has appointment with the mother
+        setHasAccess(foundAppointment);
+        setIsAccessChecking(false);
+      }, (error) => {
+        console.error("Error checking doctor-mother relationship:", error);
+        setHasAccess(false);
+        setIsAccessChecking(false);
+      });
+    } else {
+        setIsAccessChecking(false);
+        setHasAccess(false);
+    }
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubAppointments) unsubAppointments();
     };
-  }, [motherId, getPatientById, getBabyRecordsByMotherId]);
-
-
-  if (user?.role === 'patient' && user.id !== motherId) {
-     return (
-      <div className="space-y-6">
-        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold font-headline">Access Denied</h1>
-        <p>You can only view your own baby's health records.</p>
-      </div>
-    );
-  }
+  }, [user, motherId]);
 
 
   const handleFormSubmit = async (data: Omit<BabyRecord, 'id' | 'motherId'>) => {
@@ -140,7 +195,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     {
       accessorKey: 'name',
       header: 'Baby\'s Name',
-      cell: ({ row }) => row.getValue("name") || 'N/A',
+      cell: ({ row }) => row.getValue("name")?.toString() || 'N/A',
     },
     {
       accessorKey: 'birthDate',
@@ -161,14 +216,17 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     {
       accessorKey: 'birthWeight',
       header: 'Birth Weight',
+      cell: ({ row }) => row.getValue("birthWeight")?.toString() || 'N/A',
     },
     {
       accessorKey: 'birthLength',
       header: 'Birth Length',
+      cell: ({ row }) => row.getValue("birthLength")?.toString() || 'N/A',
     },
     {
       accessorKey: 'apgarScore',
       header: 'APGAR Score',
+      cell: ({ row }) => row.getValue("apgarScore")?.toString() || 'N/A',
     },
     {
       id: 'actions',
@@ -197,25 +255,55 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         );
       },
     },
-  ], [user?.role, openEditForm, setRecordToDelete]);
+  ], [user?.role]); // Removed openEditForm, setRecordToDelete as they don't change
 
-  if (!mother && babyRecordsLoading) {
+  if (motherLoading || isAccessChecking) {
      return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading mother's data...</p>
+            <p className="ml-2">Loading mother's data and verifying access...</p>
         </div>
     );
   }
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-6">
+        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
+          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
+        </Link>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You do not have permission to view these records.</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (!mother) {
-    return <div>Mother's data not found...</div>;
+    return (
+     <div className="space-y-6">
+        <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back to Patients List
+        </Link>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Mother Not Found</AlertTitle>
+          <AlertDescription>
+            The mother with ID '{motherId}' could not be found. They may have been removed or the ID is incorrect.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
+      <Link href={user?.role === 'patient' ? "/dashboard" : `/patients/${motherId}/consultations`} className="flex items-center text-sm text-primary hover:underline mb-4">
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Patients List
+          Back to {user?.role === 'patient' ? "Dashboard" : `${mother.name}'s Records`}
       </Link>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">Baby Health Records for {mother.name}'s Child(ren)</h1>
@@ -231,7 +319,16 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="ml-2">Loading baby records...</p>
         </div>
-      ) : (
+      ) : !babyRecordsLoading && babyRecords.length === 0 ? (
+        <Alert>
+            <HeartPulse className="h-4 w-4" />
+            <AlertTitle>No Baby Health Records</AlertTitle>
+            <AlertDescription>
+                There are no baby health records available for {mother.name}'s children yet.
+                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
+            </AlertDescription>
+        </Alert>
+      ): (
         <DataTable
             columns={columns}
             data={babyRecords}
@@ -276,3 +373,5 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     </div>
   );
 }
+
+    

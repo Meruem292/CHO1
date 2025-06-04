@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
-import type { ConsultationRecord, Patient } from '@/types';
+import type { ConsultationRecord, Patient, Appointment } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, ClipboardList, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,15 +39,27 @@ import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { database } from '@/lib/firebase-config';
-import { ref as dbRef, onValue } from 'firebase/database';
+import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { parseISO } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_PPP(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  if (!date) return 'N/A';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  } catch(e) {
+    return 'Invalid Date';
+  }
 }
+
+const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  if (data === null || typeof data !== 'object') return [];
+  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
+};
 
 interface ResolvedPageParams {
   patientId: string;
@@ -76,6 +88,9 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToDelete, setConsultationToDelete] = useState<ConsultationRecord | null>(null);
+  
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isAccessChecking, setIsAccessChecking] = useState(true);
 
   useEffect(() => {
     if (patientId) {
@@ -83,7 +98,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       const patientRecordRef = dbRef(database, `patients/${patientId}`);
       const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
         if (snapshot.exists()) {
-          setPatient({ id: snapshot.key, ...snapshot.val() } as Patient);
+          setPatient({ id: snapshot.key!, ...snapshot.val() } as Patient);
         } else {
           setPatient(undefined);
         }
@@ -103,19 +118,41 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     }
   }, [patientId, getConsultationsByPatientId]);
 
+  useEffect(() => {
+    let unsubAppointments: (() => void) | undefined;
+    if (!user || !patientId) {
+      setIsAccessChecking(false);
+      setHasAccess(false);
+      return;
+    }
 
-  if (user?.role === 'patient' && user.id !== patientId) {
-     return (
-      <div className="space-y-6">
-        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold font-headline">Access Denied</h1>
-        <p>You can only view your own consultation records.</p>
-      </div>
-    );
-  }
+    if (user.role === 'admin') {
+      setHasAccess(true);
+      setIsAccessChecking(false);
+    } else if (user.role === 'patient') {
+      setHasAccess(user.id === patientId);
+      setIsAccessChecking(false);
+    } else if (user.role === 'doctor') {
+      setIsAccessChecking(true);
+      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
+      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
+        const appointments = snapshotToArray<Appointment>(snapshot);
+        const foundAppointment = appointments.some(app => app.patientId === patientId);
+        setHasAccess(foundAppointment);
+        setIsAccessChecking(false);
+      }, (error) => {
+        console.error("Error checking doctor-patient relationship:", error);
+        setHasAccess(false);
+        setIsAccessChecking(false);
+      });
+    } else {
+        setIsAccessChecking(false);
+        setHasAccess(false);
+    }
+    return () => {
+      if (unsubAppointments) unsubAppointments();
+    };
+  }, [user, patientId]);
 
 
   const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId'>) => {
@@ -174,22 +211,23 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     {
       accessorKey: 'notes',
       header: 'Notes',
-      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("notes")}</p>,
+      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("notes")?.toString() || 'N/A'}</p>,
     },
     {
       accessorKey: 'diagnosis',
       header: 'Diagnosis',
+      cell: ({ row }) => row.getValue("diagnosis")?.toString() || 'N/A',
     },
     {
       accessorKey: 'treatmentPlan',
       header: 'Treatment Plan',
-       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("treatmentPlan")}</p>,
+       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("treatmentPlan")?.toString() || 'N/A'}</p>,
     },
     {
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        if (user?.role === 'patient') return null;
+        if (user?.role === 'patient') return null; // Patients cannot edit/delete
 
         return (
           <DropdownMenu>
@@ -215,12 +253,27 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     },
   ], [user?.role, openEditForm, setConsultationToDelete]);
 
-  if (patientLoading) {
+  if (patientLoading || isAccessChecking) {
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading patient data...</p>
+            <p className="ml-2">Loading patient data and verifying access...</p>
         </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-6">
+        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
+          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
+        </Link>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You do not have permission to view these records.</AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
@@ -316,3 +369,5 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
+
+    

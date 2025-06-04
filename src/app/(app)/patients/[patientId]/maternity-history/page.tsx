@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
-import type { MaternityRecord, Patient } from '@/types';
+import type { MaternityRecord, Patient, Appointment } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, Baby, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, Baby, AlertTriangle, ShieldAlert } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,15 +39,27 @@ import { MaternityHistoryForm } from '@/components/forms/maternity-history-form'
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { database } from '@/lib/firebase-config';
-import { ref as dbRef, onValue } from 'firebase/database';
+import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { parseISO } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_PPP(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  if (!date) return 'N/A';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  } catch (e) {
+    return 'Invalid Date';
+  }
 }
+
+const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  if (data === null || typeof data !== 'object') return [];
+  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
+};
 
 interface ResolvedPageParams {
   patientId: string;
@@ -77,13 +89,16 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
   const [editingRecord, setEditingRecord] = useState<MaternityRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
 
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isAccessChecking, setIsAccessChecking] = useState(true);
+
   useEffect(() => {
     if (patientId) {
       setPatientLoading(true);
       const patientRecordRef = dbRef(database, `patients/${patientId}`);
       const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
         if (snapshot.exists()) {
-          setPatient({ id: snapshot.key, ...snapshot.val() } as Patient);
+          setPatient({ id: snapshot.key!, ...snapshot.val() } as Patient);
         } else {
           setPatient(undefined);
         }
@@ -103,18 +118,41 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     }
   }, [patientId, getMaternityHistoryByPatientId]);
 
-  if (user?.role === 'patient' && user.id !== patientId) {
-    return (
-     <div className="space-y-6">
-       <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-         <ChevronLeft className="h-4 w-4 mr-1" />
-         Back to Dashboard
-       </Link>
-       <h1 className="text-2xl font-bold font-headline">Access Denied</h1>
-       <p>You can only view your own maternity records.</p>
-     </div>
-   );
- }
+  useEffect(() => {
+    let unsubAppointments: (() => void) | undefined;
+    if (!user || !patientId) {
+      setIsAccessChecking(false);
+      setHasAccess(false);
+      return;
+    }
+
+    if (user.role === 'admin') {
+      setHasAccess(true);
+      setIsAccessChecking(false);
+    } else if (user.role === 'patient') {
+      setHasAccess(user.id === patientId);
+      setIsAccessChecking(false);
+    } else if (user.role === 'doctor') {
+      setIsAccessChecking(true);
+      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
+      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
+        const appointments = snapshotToArray<Appointment>(snapshot);
+        const foundAppointment = appointments.some(app => app.patientId === patientId);
+        setHasAccess(foundAppointment);
+        setIsAccessChecking(false);
+      }, (error) => {
+        console.error("Error checking doctor-patient relationship:", error);
+        setHasAccess(false);
+        setIsAccessChecking(false);
+      });
+    } else {
+        setIsAccessChecking(false);
+        setHasAccess(false);
+    }
+    return () => {
+      if (unsubAppointments) unsubAppointments();
+    };
+  }, [user, patientId]);
 
   const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId'>) => {
     const recordData = { ...data, patientId };
@@ -176,11 +214,12 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     {
       accessorKey: 'outcome',
       header: 'Outcome',
+      cell: ({ row }) => row.getValue("outcome")?.toString() || 'N/A',
     },
     {
       accessorKey: 'complications',
       header: 'Complications',
-      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("complications") || 'None'}</p>,
+      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("complications")?.toString() || 'None'}</p>,
     },
     {
       id: 'actions',
@@ -211,12 +250,27 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     },
   ], [user?.role, openEditForm, setRecordToDelete]);
 
-  if (patientLoading) {
+  if (patientLoading || isAccessChecking) {
      return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading patient data...</p>
+            <p className="ml-2">Loading patient data and verifying access...</p>
         </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-6">
+        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
+          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
+        </Link>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You do not have permission to view these records.</AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
@@ -312,3 +366,5 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     </div>
   );
 }
+
+    

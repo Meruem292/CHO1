@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Patient } from '@/types';
+import type { Patient, Appointment } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Eye, Loader2 } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Eye, Loader2, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,40 +34,89 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PatientForm } from '@/components/forms/patient-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { parseISO } from 'date-fns';
+import { database } from '@/lib/firebase-config';
+import { ref as dbRef, query, orderByChild, equalTo, onValue } from 'firebase/database';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_PPP(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  if (!date) return 'N/A';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  } catch (e) {
+    return 'Invalid Date';
+  }
 }
 
+const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  if (data === null || typeof data !== 'object') return [];
+  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
+};
 
 export default function PatientsPage() {
   const { user } = useAuth();
-  const { patients, patientsLoading, addPatient, updatePatient, deletePatient } = useMockDb();
+  const { 
+    patients: allPatientsFromHook, // Renamed to avoid conflict
+    patientsLoading, 
+    addPatient, 
+    updatePatient, 
+    deletePatient 
+  } = useMockDb();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | undefined>(undefined);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
 
+  const [doctorAppointments, setDoctorAppointments] = useState<Appointment[]>([]);
+  const [doctorAppointmentsLoading, setDoctorAppointmentsLoading] = useState(user?.role === 'doctor');
+
+  useEffect(() => {
+    let unsubAppointments: (() => void) | undefined;
+    if (user?.role === 'doctor' && user.id) {
+      setDoctorAppointmentsLoading(true);
+      const appointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
+      unsubAppointments = onValue(appointmentsQuery, (snapshot) => {
+        setDoctorAppointments(snapshotToArray<Appointment>(snapshot));
+        setDoctorAppointmentsLoading(false);
+      }, (error) => {
+        console.error("Error fetching doctor's appointments:", error);
+        setDoctorAppointmentsLoading(false);
+      });
+    }
+    return () => {
+      if (unsubAppointments) unsubAppointments();
+    };
+  }, [user]);
+
   const displayedPatients = useMemo(() => {
-    return patients.filter(p => p.role === 'patient');
-  }, [patients]);
+    if (user?.role === 'admin') {
+      return allPatientsFromHook.filter(p => p.role === 'patient');
+    }
+    if (user?.role === 'doctor') {
+      if (doctorAppointmentsLoading) return [];
+      const patientIdsForDoctor = new Set(doctorAppointments.map(app => app.patientId));
+      return allPatientsFromHook.filter(p => p.role === 'patient' && patientIdsForDoctor.has(p.id));
+    }
+    return []; // Should not be reached if page access is correct
+  }, [allPatientsFromHook, user, doctorAppointments, doctorAppointmentsLoading]);
 
   const handleFormSubmit = async (data: Omit<Patient, 'id' | 'role'>) => {
     const patientDataWithRole: Omit<Patient, 'id'> = { ...data, role: 'patient' };
     try {
       if (editingPatient) {
         await updatePatient(editingPatient.id, patientDataWithRole);
-        toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
+        toast({ title: "Patient Updated", description: `${data.firstName} ${data.lastName} has been updated.` });
       } else {
         const constructedName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
-        await addPatient({ ...patientDataWithRole, name: constructedName });
+        await addPatient({ ...patientDataWithRole, name: constructedName, firstName: data.firstName, lastName: data.lastName, middleName: data.middleName });
         toast({ title: "Patient Added", description: `${constructedName} has been added.` });
       }
       setIsFormOpen(false);
@@ -163,16 +212,24 @@ export default function PatientsPage() {
   ], [user?.role]);
 
 
-  if (user?.role === 'patient') {
+  if (user?.role === 'patient') { // Patients should not access this page at all.
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-4 font-headline">Access Denied</h1>
-        <p>This page is for administrative staff only.</p>
+      <div className="space-y-6">
+        <Alert variant="destructive">
+            <Users className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>This page is for administrative staff and doctors only.</AlertDescription>
+        </Alert>
+         <Link href="/dashboard" className="text-primary hover:underline">
+            Go to Dashboard
+        </Link>
       </div>
     );
   }
 
-  if (patientsLoading && displayedPatients.length === 0) {
+  const overallLoading = patientsLoading || (user?.role === 'doctor' && doctorAppointmentsLoading);
+
+  if (overallLoading && displayedPatients.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -184,7 +241,9 @@ export default function PatientsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold font-headline">Manage Patients</h1>
+        <h1 className="text-3xl font-bold font-headline">
+          {user?.role === 'admin' ? 'Manage All Patients' : 'My Associated Patients'}
+        </h1>
         {(user?.role === 'admin') && ( 
           <Button onClick={() => { setEditingPatient(undefined); setIsFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Patient
@@ -192,12 +251,22 @@ export default function PatientsPage() {
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={displayedPatients} 
-        filterColumnId="name"
-        filterPlaceholder="Filter by name..."
-      />
+      {(!overallLoading && displayedPatients.length === 0) ? (
+         <Alert>
+            <Users className="h-4 w-4" />
+            <AlertTitle>No Patients Found</AlertTitle>
+            <AlertDescription>
+                {user?.role === 'admin' ? "There are no patients in the system yet. You can add one using the 'Add Patient' button." : "You do not have any patients associated with your appointments yet."}
+            </AlertDescription>
+        </Alert>
+      ) : (
+        <DataTable
+            columns={columns}
+            data={displayedPatients} 
+            filterColumnId="name"
+            filterPlaceholder="Filter by name..."
+        />
+      )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -237,3 +306,5 @@ export default function PatientsPage() {
     </div>
   );
 }
+
+    
