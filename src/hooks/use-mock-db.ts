@@ -54,6 +54,9 @@ export function useMockDb() {
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
   const [doctorScheduleLoading, setDoctorScheduleLoading] = useState(true);
 
+  const [allDoctorSchedules, setAllDoctorSchedules] = useState<DoctorSchedule[]>([]);
+  const [allDoctorSchedulesLoading, setAllDoctorSchedulesLoading] = useState(true);
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
 
@@ -226,6 +229,20 @@ export function useMockDb() {
     return unsubscribe;
   }, []);
 
+  const getAllDoctorSchedules = useCallback(() => {
+    setAllDoctorSchedulesLoading(true);
+    const schedulesRef = ref(database, 'doctorSchedules');
+    const unsubscribe = onValue(schedulesRef, (snapshot) => {
+      setAllDoctorSchedules(snapshotToArray<DoctorSchedule>(snapshot));
+      setAllDoctorSchedulesLoading(false);
+    }, (error) => {
+      console.error("Error fetching all doctor schedules:", error);
+      setAllDoctorSchedules([]);
+      setAllDoctorSchedulesLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
   const saveDoctorSchedule = useCallback(async (scheduleData: Omit<DoctorSchedule, 'id' | 'createdAt' | 'updatedAt'>) => {
     const scheduleRef = ref(database, `doctorSchedules/${scheduleData.doctorId}`);
     const dataToSave: Partial<DoctorSchedule> = {
@@ -246,8 +263,8 @@ export function useMockDb() {
     const unsubscribe = onValue(appointmentsQuery, (snapshot) => {
       let records = snapshotToArray<Appointment>(snapshot);
       records.sort((a, b) => {
-        const aDate = parseISO(a.appointmentDateTimeStart);
-        const bDate = parseISO(b.appointmentDateTimeStart);
+        const aDate = parseISO(a.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
+        const bDate = parseISO(b.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
         if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
         if (a.status !== 'scheduled' && b.status === 'scheduled') return 1;
         if (a.status === 'scheduled' && b.status === 'scheduled') {
@@ -271,8 +288,8 @@ export function useMockDb() {
     const unsubscribe = onValue(appointmentsQuery, (snapshot) => {
       let records = snapshotToArray<Appointment>(snapshot);
        records.sort((a, b) => {
-        const aDate = parseISO(a.appointmentDateTimeStart);
-        const bDate = parseISO(b.appointmentDateTimeStart);
+        const aDate = parseISO(a.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
+        const bDate = parseISO(b.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
         if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
         if (a.status !== 'scheduled' && b.status === 'scheduled') return 1;
         if (a.status === 'scheduled' && b.status === 'scheduled') {
@@ -296,8 +313,8 @@ export function useMockDb() {
     const unsubscribe = onValue(appointmentsRef, (snapshot) => {
       let records = snapshotToArray<Appointment>(snapshot);
       records.sort((a, b) => { // Sort by date, then by status preference
-        const aDate = parseISO(a.appointmentDateTimeStart);
-        const bDate = parseISO(b.appointmentDateTimeStart);
+        const aDate = parseISO(a.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
+        const bDate = parseISO(b.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
         const dateComparison = compareAsc(aDate, bDate);
         if (dateComparison !== 0) return dateComparison; // Primary sort: date
 
@@ -372,6 +389,7 @@ export function useMockDb() {
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
     babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, addBabyRecord, updateBabyRecord, deleteBabyRecord,
     doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
+    allDoctorSchedules, allDoctorSchedulesLoading, getAllDoctorSchedules,
     appointments, appointmentsLoading, getAppointmentsByPatientId, getAppointmentsByDoctorId, updateAppointmentStatus,
     allAppointmentsForAdmin, allAppointmentsLoading, getAllAppointments,
     doctorAppointmentsForBooking, doctorAppointmentsLoading, getAppointmentsByDoctorIdForBooking,
