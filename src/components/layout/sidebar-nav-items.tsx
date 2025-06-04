@@ -2,40 +2,29 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // Removed useParams as it's no longer needed here
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth-hook';
 import type { NavItem } from '@/types';
-import { NAV_ITEMS, PATIENT_NAV_ITEMS } from '@/lib/constants';
+import { NAV_ITEMS } from '@/lib/constants'; // Removed PATIENT_NAV_ITEMS
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar'; // Assuming these are part of your sidebar component structure
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 
 export function SidebarNavItems() {
   const pathname = usePathname();
-  const params = useParams();
   const { user } = useAuth();
 
   if (!user) return null;
 
-  const patientIdFromUrl = params.patientId as string | undefined;
-
-  let itemsToRender: NavItem[];
-
-  if (patientIdFromUrl && (user.role === 'admin' || user.role === 'doctor')) {
-    // Admin or Doctor is viewing a specific patient's records
-    itemsToRender = PATIENT_NAV_ITEMS;
-  } else {
-    // Either on a general page, or a Patient is viewing their own records (patientIdFromUrl might be user.id)
-    itemsToRender = NAV_ITEMS;
-  }
+  // The sidebar will now always use NAV_ITEMS.
+  // Patient-specific sub-navigation will be handled within the patient's layout.
+  const itemsToRender: NavItem[] = NAV_ITEMS;
 
   const getHref = (item: NavItem) => {
-    // For PATIENT_NAV_ITEMS (admin/doctor viewing specific patient)
-    if (patientIdFromUrl && item.patientSpecific && (user.role === 'admin' || user.role === 'doctor')) {
-      return `/patients/${patientIdFromUrl}${item.href}`;
-    }
     // For NAV_ITEMS when user is a patient (links to their own records)
     if (user.role === 'patient' && item.patientSpecific) {
+      // Construct the patient-specific path by prepending /patients/[userId]
+      // Example: item.href = '/consultations' becomes '/patients/[userId]/consultations'
       return `/patients/${user.id}${item.href}`;
     }
     // Default for general NAV_ITEMS or non-patientSpecific items
@@ -49,13 +38,18 @@ export function SidebarNavItems() {
           .filter(item => item.roles.includes(user.role))
           .map((item) => {
             const href = getHref(item);
-            const isActive = pathname === href || (href !== '/' && pathname.startsWith(href + '/') && href.length > 1);
-            // Ensure dashboard ('/') active state is handled correctly and doesn't match all other routes
-            const isDashboardActive = href === '/' && pathname === '/';
-            const finalIsActive = href === '/' ? isDashboardActive : isActive;
+            
+            // More robust active state checking
+            let finalIsActive = false;
+            if (href === '/') { // Handle dashboard explicitly
+              finalIsActive = pathname === '/dashboard' || pathname === '/';
+            } else {
+              finalIsActive = pathname === href || (item.patientSpecific && user.role === 'patient' ? pathname.startsWith(`/patients/${user.id}${item.href}`) : pathname.startsWith(href + '/'));
+            }
+
 
             return (
-              <SidebarMenuItem key={item.label + item.href}> {/* Ensure key is unique, combining label and original href */}
+              <SidebarMenuItem key={item.label + item.href}>
                 <SidebarMenuButton
                   asChild
                   isActive={finalIsActive}

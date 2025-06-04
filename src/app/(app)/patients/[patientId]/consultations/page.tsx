@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,14 +37,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
-import Link from 'next/link';
-import { database } from '@/lib/firebase-config';
-import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
+// import Link from 'next/link'; // Link is handled by the layout
 import { parseISO } from 'date-fns';
+
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-function formatInPHTime_PPP(date: Date | string): string {
+function formatInPHTime_PPP(date: Date | string | undefined): string {
   if (!date) return 'N/A';
   try {
     const d = typeof date === 'string' ? parseISO(date) : date;
@@ -53,13 +52,6 @@ function formatInPHTime_PPP(date: Date | string): string {
     return 'Invalid Date';
   }
 }
-
-const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
-  if (!snapshot.exists()) return [];
-  const data = snapshot.val();
-  if (data === null || typeof data !== 'object') return [];
-  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
-};
 
 interface ResolvedPageParams {
   patientId: string;
@@ -71,7 +63,7 @@ interface ConsultationsPageProps {
 
 export default function PatientConsultationsPage({ params: paramsPromise }: ConsultationsPageProps) {
   const actualParams = use(paramsPromise);
-  const { patientId } = actualParams;
+  const { patientId } = actualParams; // Access control is now in the layout
 
   const { user } = useAuth();
   const {
@@ -82,77 +74,24 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     updateConsultation,
     deleteConsultation
   } = useMockDb();
-
-  const [patient, setPatient] = useState<Patient | undefined>(undefined);
-  const [patientLoading, setPatientLoading] = useState(true);
+  
+  const [patientName, setPatientName] = useState<string>(''); // Only need name for descriptions
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToDelete, setConsultationToDelete] = useState<ConsultationRecord | null>(null);
   
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isAccessChecking, setIsAccessChecking] = useState(true);
-
   useEffect(() => {
-    if (patientId) {
-      setPatientLoading(true);
-      const patientRecordRef = dbRef(database, `patients/${patientId}`);
-      const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setPatient({ id: snapshot.key!, ...snapshot.val() } as Patient);
-        } else {
-          setPatient(undefined);
-        }
-        setPatientLoading(false);
-      }, (error) => {
-        console.error("Error fetching patient data:", error);
-        setPatient(undefined);
-        setPatientLoading(false);
-      });
-
-      const unsubscribeConsultations = getConsultationsByPatientId(patientId);
-
-      return () => {
-        unsubscribePatient();
-        if (unsubscribeConsultations) unsubscribeConsultations();
-      };
-    }
-  }, [patientId, getConsultationsByPatientId]);
-
-  useEffect(() => {
-    let unsubAppointments: (() => void) | undefined;
-    if (!user || !patientId) {
-      setIsAccessChecking(false);
-      setHasAccess(false);
-      return;
-    }
-
-    if (user.role === 'admin') {
-      setHasAccess(true);
-      setIsAccessChecking(false);
-    } else if (user.role === 'patient') {
-      setHasAccess(user.id === patientId);
-      setIsAccessChecking(false);
-    } else if (user.role === 'doctor') {
-      setIsAccessChecking(true);
-      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
-      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
-        const appointments = snapshotToArray<Appointment>(snapshot);
-        const foundAppointment = appointments.some(app => app.patientId === patientId);
-        setHasAccess(foundAppointment);
-        setIsAccessChecking(false);
-      }, (error) => {
-        console.error("Error checking doctor-patient relationship:", error);
-        setHasAccess(false);
-        setIsAccessChecking(false);
-      });
-    } else {
-        setIsAccessChecking(false);
-        setHasAccess(false);
-    }
+    // Fetch patient name for descriptions if needed, or rely on layout's patient object
+    const patientRecordRef = dbRef(database, `patients/${patientId}/name`);
+    const unsubName = onValue(patientRecordRef, (snapshot) => {
+        setPatientName(snapshot.val() || 'Patient');
+    });
+    const unsubscribeConsultations = getConsultationsByPatientId(patientId);
     return () => {
-      if (unsubAppointments) unsubAppointments();
+        unsubName();
+        if (unsubscribeConsultations) unsubscribeConsultations();
     };
-  }, [user, patientId]);
+  }, [patientId, getConsultationsByPatientId]);
 
 
   const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId'>) => {
@@ -204,7 +143,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         </Button>
       ),
       cell: ({ row }) => {
-        const dateVal = row.getValue("date") as string;
+        const dateVal = row.getValue("date") as string | undefined;
         return dateVal ? formatInPHTime_PPP(dateVal) : 'N/A';
       }
     },
@@ -227,7 +166,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        if (user?.role === 'patient') return null; // Patients cannot edit/delete
+        if (user?.role === 'patient') return null; 
 
         return (
           <DropdownMenu>
@@ -253,56 +192,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     },
   ], [user?.role, openEditForm, setConsultationToDelete]);
 
-  if (patientLoading || isAccessChecking) {
-    return (
-        <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading patient data and verifying access...</p>
-        </div>
-    );
-  }
-
-  if (!hasAccess) {
-    return (
-      <div className="space-y-6">
-        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
-        </Link>
-        <Alert variant="destructive">
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>You do not have permission to view these records.</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!patient) {
-    return (
-      <div className="space-y-6">
-        <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Patients List
-        </Link>
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Patient Not Found</AlertTitle>
-          <AlertDescription>
-            The patient with ID '{patientId}' could not be found. They may have been removed or the ID is incorrect.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <Link href={user?.role === 'patient' ? "/dashboard" : "/patients"} className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to {user?.role === 'patient' ? "Dashboard" : "Patients List"}
-      </Link>
+    <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold font-headline">Consultations for {patient.name}</h1>
+        <h2 className="text-2xl font-semibold">Consultation History</h2>
         {(user?.role === 'admin' || user?.role === 'doctor') && (
           <Button onClick={() => { setEditingConsultation(undefined); setIsFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Consultation
@@ -320,7 +214,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <ClipboardList className="h-4 w-4" />
             <AlertTitle>No Consultation Records</AlertTitle>
             <AlertDescription>
-                There are no consultation records available for {patient.name} yet.
+                There are no consultation records available for {patientName} yet.
                 {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
             </AlertDescription>
         </Alert>
@@ -333,13 +227,12 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         />
       )}
 
-
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingConsultation ? 'Edit Consultation' : 'Add New Consultation'}</DialogTitle>
             <DialogDescription>
-              Manage consultation records for {patient.name}.
+              Manage consultation records for {patientName}.
             </DialogDescription>
           </DialogHeader>
           <ConsultationForm
@@ -369,5 +262,3 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
-
-    

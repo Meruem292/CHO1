@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, HeartPulse, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, HeartPulse, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,14 +37,14 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
-import Link from 'next/link';
+// import Link from 'next/link'; // Link is handled by the layout
 import { parseISO } from 'date-fns';
 import { database } from '@/lib/firebase-config';
-import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { ref as dbRef, onValue } from 'firebase/database';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-function formatInPHTime_PPP(date: Date | string): string {
+function formatInPHTime_PPP(date: Date | string | undefined): string {
   if (!date) return 'N/A';
   try {
     const d = typeof date === 'string' ? parseISO(date) : date;
@@ -53,13 +53,6 @@ function formatInPHTime_PPP(date: Date | string): string {
     return 'Invalid Date';
   }
 }
-
-const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
-  if (!snapshot.exists()) return [];
-  const data = snapshot.val();
-  if (data === null || typeof data !== 'object') return [];
-  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
-};
 
 interface ResolvedPageParams {
   patientId: string; 
@@ -71,7 +64,7 @@ interface BabyHealthPageProps {
 
 export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHealthPageProps) {
   const actualParams = use(paramsPromise); 
-  const { patientId: motherId } = actualParams; 
+  const { patientId: motherId } = actualParams; // Access control handled by layout
 
   const { user } = useAuth();
   const { 
@@ -83,76 +76,22 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     deleteBabyRecord 
   } = useMockDb();
 
-  const [mother, setMother] = useState<Patient | undefined>(undefined);
-  const [motherLoading, setMotherLoading] = useState(true);
+  const [motherName, setMotherName] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<BabyRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<BabyRecord | null>(null);
 
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isAccessChecking, setIsAccessChecking] = useState(true);
-
-
   useEffect(() => {
-    if (motherId) {
-      setMotherLoading(true);
-      const motherRecordRef = dbRef(database, `patients/${motherId}`);
-      const unsubscribeMother = onValue(motherRecordRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setMother({ id: snapshot.key!, ...snapshot.val() } as Patient);
-        } else {
-          setMother(undefined);
-        }
-        setMotherLoading(false);
-      }, (error) => {
-        console.error("Error fetching mother's data:", error);
-        setMother(undefined);
-        setMotherLoading(false);
-      });
-      
-      const unsubscribeBabyRecords = getBabyRecordsByMotherId(motherId);
-      return () => {
-        unsubscribeMother();
-        if (unsubscribeBabyRecords) unsubscribeBabyRecords();
-      };
-    }
-  }, [motherId, getBabyRecordsByMotherId]);
-
-  useEffect(() => {
-    let unsubAppointments: (() => void) | undefined;
-    if (!user || !motherId) {
-      setIsAccessChecking(false);
-      setHasAccess(false);
-      return;
-    }
-
-    if (user.role === 'admin') {
-      setHasAccess(true);
-      setIsAccessChecking(false);
-    } else if (user.role === 'patient') {
-      setHasAccess(user.id === motherId); // Patient can only see their own baby's records
-      setIsAccessChecking(false);
-    } else if (user.role === 'doctor') {
-      setIsAccessChecking(true);
-      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
-      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
-        const appointments = snapshotToArray<Appointment>(snapshot);
-        const foundAppointment = appointments.some(app => app.patientId === motherId); // Check if doctor has appointment with the mother
-        setHasAccess(foundAppointment);
-        setIsAccessChecking(false);
-      }, (error) => {
-        console.error("Error checking doctor-mother relationship:", error);
-        setHasAccess(false);
-        setIsAccessChecking(false);
-      });
-    } else {
-        setIsAccessChecking(false);
-        setHasAccess(false);
-    }
+    const motherRecordRef = dbRef(database, `patients/${motherId}/name`);
+    const unsubName = onValue(motherRecordRef, (snapshot) => {
+        setMotherName(snapshot.val() || 'Mother');
+    });
+    const unsubscribeBabyRecords = getBabyRecordsByMotherId(motherId);
     return () => {
-      if (unsubAppointments) unsubAppointments();
+      unsubName();
+      if (unsubscribeBabyRecords) unsubscribeBabyRecords();
     };
-  }, [user, motherId]);
+  }, [motherId, getBabyRecordsByMotherId]);
 
 
   const handleFormSubmit = async (data: Omit<BabyRecord, 'id' | 'motherId'>) => {
@@ -209,7 +148,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         </Button>
       ),
       cell: ({ row }) => {
-        const dateVal = row.getValue("birthDate") as string;
+        const dateVal = row.getValue("birthDate") as string | undefined;
         return dateVal ? formatInPHTime_PPP(dateVal) : 'N/A';
       }
     },
@@ -255,58 +194,12 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         );
       },
     },
-  ], [user?.role]); // Removed openEditForm, setRecordToDelete as they don't change
-
-  if (motherLoading || isAccessChecking) {
-     return (
-        <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading mother's data and verifying access...</p>
-        </div>
-    );
-  }
-
-  if (!hasAccess) {
-    return (
-      <div className="space-y-6">
-        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
-        </Link>
-        <Alert variant="destructive">
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>You do not have permission to view these records.</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!mother) {
-    return (
-     <div className="space-y-6">
-        <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Patients List
-        </Link>
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Mother Not Found</AlertTitle>
-          <AlertDescription>
-            The mother with ID '{motherId}' could not be found. They may have been removed or the ID is incorrect.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  ], [user?.role]); 
 
   return (
-    <div className="space-y-6">
-      <Link href={user?.role === 'patient' ? "/dashboard" : `/patients/${motherId}/consultations`} className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to {user?.role === 'patient' ? "Dashboard" : `${mother.name}'s Records`}
-      </Link>
+    <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold font-headline">Baby Health Records for {mother.name}'s Child(ren)</h1>
+        <h2 className="text-2xl font-semibold">Baby Health Records for {motherName}'s Child(ren)</h2>
         {(user?.role === 'admin' || user?.role === 'doctor') && (
             <Button onClick={() => { setEditingRecord(undefined); setIsFormOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Baby Record
@@ -324,7 +217,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             <HeartPulse className="h-4 w-4" />
             <AlertTitle>No Baby Health Records</AlertTitle>
             <AlertDescription>
-                There are no baby health records available for {mother.name}'s children yet.
+                There are no baby health records available for {motherName}'s children yet.
                 {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
             </AlertDescription>
         </Alert>
@@ -337,13 +230,12 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         />
       )}
 
-
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingRecord ? 'Edit Baby Record' : 'Add New Baby Record'}</DialogTitle>
             <DialogDescription>
-              Manage baby health records for {mother.name}'s child.
+              Manage baby health records for {motherName}'s child.
             </DialogDescription>
           </DialogHeader>
           <BabyHealthForm
@@ -373,5 +265,3 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     </div>
   );
 }
-
-    

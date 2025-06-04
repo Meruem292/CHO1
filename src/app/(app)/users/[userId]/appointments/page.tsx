@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-function formatInPHTime_Combined(dateString: string): string {
+function formatInPHTime_Combined(dateString: string | undefined): string {
   if (!dateString) return "Invalid Date";
   try {
     const d = parseISO(dateString);
@@ -136,10 +136,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
           Date & Time <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => {
-        const dateTime = row.original?.appointmentDateTimeStart;
-        return dateTime ? formatInPHTime_Combined(dateTime) : 'Invalid Date';
-      },
+      cell: ({ row }) => formatInPHTime_Combined(row.original?.appointmentDateTimeStart),
       accessorFn: (row) => row.original?.appointmentDateTimeStart || '',
       sortingFn: 'datetime',
     },
@@ -192,7 +189,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         return (
           <div className="flex space-x-2">
             {showViewPatientRecordsButton && (
-              <Link href={`/patients/${appointment.patientId}/consultations`}>
+              <Link href={`/patients/${appointment.patientId}/profile`}>
                 <Button variant="outline" size="sm">
                   <Eye className="mr-2 h-4 w-4" /> Patient Records
                 </Button>
@@ -314,5 +311,3 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     </div>
   );
 }
-
-    

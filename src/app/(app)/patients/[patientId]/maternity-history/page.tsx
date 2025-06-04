@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, ChevronLeft, Loader2, Baby, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,14 +37,14 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MaternityHistoryForm } from '@/components/forms/maternity-history-form';
 import { toast } from '@/hooks/use-toast';
-import Link from 'next/link';
+// import Link from 'next/link'; // Link is handled by the layout
 import { database } from '@/lib/firebase-config';
-import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { ref as dbRef, onValue } from 'firebase/database';
 import { parseISO } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-function formatInPHTime_PPP(date: Date | string): string {
+function formatInPHTime_PPP(date: Date | string | undefined): string {
   if (!date) return 'N/A';
   try {
     const d = typeof date === 'string' ? parseISO(date) : date;
@@ -53,13 +53,6 @@ function formatInPHTime_PPP(date: Date | string): string {
     return 'Invalid Date';
   }
 }
-
-const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
-  if (!snapshot.exists()) return [];
-  const data = snapshot.val();
-  if (data === null || typeof data !== 'object') return [];
-  return Object.keys(data).map(key => ({ ...data[key], id: key } as T));
-};
 
 interface ResolvedPageParams {
   patientId: string;
@@ -71,7 +64,7 @@ interface MaternityHistoryPageProps {
 
 export default function PatientMaternityHistoryPage({ params: paramsPromise }: MaternityHistoryPageProps) {
   const actualParams = use(paramsPromise);
-  const { patientId } = actualParams;
+  const { patientId } = actualParams; // Access control handled by layout
 
   const { user } = useAuth();
   const { 
@@ -83,76 +76,23 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     deleteMaternityRecord 
   } = useMockDb();
 
-  const [patient, setPatient] = useState<Patient | undefined>(undefined);
-  const [patientLoading, setPatientLoading] = useState(true);
+  const [patientName, setPatientName] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaternityRecord | undefined>(undefined);
   const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
 
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isAccessChecking, setIsAccessChecking] = useState(true);
-
   useEffect(() => {
-    if (patientId) {
-      setPatientLoading(true);
-      const patientRecordRef = dbRef(database, `patients/${patientId}`);
-      const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setPatient({ id: snapshot.key!, ...snapshot.val() } as Patient);
-        } else {
-          setPatient(undefined);
-        }
-        setPatientLoading(false);
-      }, (error) => {
-        console.error("Error fetching patient data:", error);
-        setPatient(undefined);
-        setPatientLoading(false);
-      });
-
-      const unsubscribeMaternity = getMaternityHistoryByPatientId(patientId);
-      
-      return () => {
-        unsubscribePatient();
-        if (unsubscribeMaternity) unsubscribeMaternity();
-      };
-    }
+    const patientRecordRef = dbRef(database, `patients/${patientId}/name`);
+    const unsubName = onValue(patientRecordRef, (snapshot) => {
+        setPatientName(snapshot.val() || 'Patient');
+    });
+    const unsubscribeMaternity = getMaternityHistoryByPatientId(patientId);
+    return () => {
+      unsubName();
+      if (unsubscribeMaternity) unsubscribeMaternity();
+    };
   }, [patientId, getMaternityHistoryByPatientId]);
 
-  useEffect(() => {
-    let unsubAppointments: (() => void) | undefined;
-    if (!user || !patientId) {
-      setIsAccessChecking(false);
-      setHasAccess(false);
-      return;
-    }
-
-    if (user.role === 'admin') {
-      setHasAccess(true);
-      setIsAccessChecking(false);
-    } else if (user.role === 'patient') {
-      setHasAccess(user.id === patientId);
-      setIsAccessChecking(false);
-    } else if (user.role === 'doctor') {
-      setIsAccessChecking(true);
-      const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
-      unsubAppointments = onValue(doctorAppointmentsQuery, (snapshot) => {
-        const appointments = snapshotToArray<Appointment>(snapshot);
-        const foundAppointment = appointments.some(app => app.patientId === patientId);
-        setHasAccess(foundAppointment);
-        setIsAccessChecking(false);
-      }, (error) => {
-        console.error("Error checking doctor-patient relationship:", error);
-        setHasAccess(false);
-        setIsAccessChecking(false);
-      });
-    } else {
-        setIsAccessChecking(false);
-        setHasAccess(false);
-    }
-    return () => {
-      if (unsubAppointments) unsubAppointments();
-    };
-  }, [user, patientId]);
 
   const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId'>) => {
     const recordData = { ...data, patientId };
@@ -207,7 +147,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
       accessorKey: 'deliveryDate',
       header: 'Delivery Date',
       cell: ({ row }) => {
-        const dateVal = row.getValue("deliveryDate") as string;
+        const dateVal = row.getValue("deliveryDate") as string | undefined;
         return dateVal ? formatInPHTime_PPP(dateVal) : 'N/A';
       }
     },
@@ -250,57 +190,10 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     },
   ], [user?.role, openEditForm, setRecordToDelete]);
 
-  if (patientLoading || isAccessChecking) {
-     return (
-        <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading patient data and verifying access...</p>
-        </div>
-    );
-  }
-
-  if (!hasAccess) {
-    return (
-      <div className="space-y-6">
-        <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Dashboard
-        </Link>
-        <Alert variant="destructive">
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>You do not have permission to view these records.</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!patient) {
-     return (
-      <div className="space-y-6">
-        <Link href="/patients" className="flex items-center text-sm text-primary hover:underline mb-4">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Patients List
-        </Link>
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Patient Not Found</AlertTitle>
-          <AlertDescription>
-            The patient with ID '{patientId}' could not be found. They may have been removed or the ID is incorrect.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-
   return (
-    <div className="space-y-6">
-       <Link href={user?.role === 'patient' ? "/dashboard" : "/patients"} className="flex items-center text-sm text-primary hover:underline mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to {user?.role === 'patient' ? "Dashboard" : "Patients List"}
-      </Link>
+    <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold font-headline">Maternity History for {patient.name}</h1>
+        <h2 className="text-2xl font-semibold">Maternity History</h2>
          {(user?.role === 'admin' || user?.role === 'doctor') && (
             <Button onClick={() => { setEditingRecord(undefined); setIsFormOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Maternity Record
@@ -318,7 +211,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <Baby className="h-4 w-4" />
             <AlertTitle>No Maternity History</AlertTitle>
             <AlertDescription>
-                There are no maternity history records available for {patient.name} yet.
+                There are no maternity history records available for {patientName} yet.
                 {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
             </AlertDescription>
         </Alert>
@@ -336,7 +229,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
           <DialogHeader>
             <DialogTitle>{editingRecord ? 'Edit Maternity Record' : 'Add New Maternity Record'}</DialogTitle>
             <DialogDescription>
-              Manage maternity history for {patient.name}.
+              Manage maternity history for {patientName}.
             </DialogDescription>
           </DialogHeader>
           <MaternityHistoryForm
@@ -366,5 +259,3 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     </div>
   );
 }
-
-    

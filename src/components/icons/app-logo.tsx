@@ -9,7 +9,7 @@ interface AppLogoProps {
 export function AppLogo({ className, width = 32, height = 32 }: AppLogoProps) {
   return (
     <Image
-      src="/app-logo.svg" // Ensure your logo file is at public/app-logo.svg (or .png, .jpg etc.)
+      src="/app-logo.png" // Ensure your logo file is at public/app-logo.svg (or .png, .jpg etc.)
       alt="City Health Office Logo"
       width={width}
       height={height}

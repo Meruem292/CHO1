@@ -44,7 +44,7 @@ import { ref as dbRef, query, orderByChild, equalTo, onValue } from 'firebase/da
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-function formatInPHTime_PPP(date: Date | string): string {
+function formatInPHTime_PPP(date: Date | string | undefined): string {
   if (!date) return 'N/A';
   try {
     const d = typeof date === 'string' ? parseISO(date) : date;
@@ -64,7 +64,7 @@ const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
 export default function PatientsPage() {
   const { user } = useAuth();
   const { 
-    patients: allPatientsFromHook, // Renamed to avoid conflict
+    patients: allPatientsFromHook, 
     patientsLoading, 
     addPatient, 
     updatePatient, 
@@ -105,7 +105,7 @@ export default function PatientsPage() {
       const patientIdsForDoctor = new Set(doctorAppointments.map(app => app.patientId));
       return allPatientsFromHook.filter(p => p.role === 'patient' && patientIdsForDoctor.has(p.id));
     }
-    return []; // Should not be reached if page access is correct
+    return []; 
   }, [allPatientsFromHook, user, doctorAppointments, doctorAppointmentsLoading]);
 
   const handleFormSubmit = async (data: Omit<Patient, 'id' | 'role'>) => {
@@ -162,7 +162,7 @@ export default function PatientsPage() {
       accessorKey: 'dateOfBirth',
       header: 'Date of Birth',
        cell: ({ row }) => {
-        const dob = row.getValue("dateOfBirth") as string;
+        const dob = row.getValue("dateOfBirth") as string | undefined;
         return dob ? formatInPHTime_PPP(dob) : 'N/A';
        }
     },
@@ -180,7 +180,7 @@ export default function PatientsPage() {
         const patient = row.original;
         return (
           <div className="flex items-center space-x-2">
-             <Link href={`/patients/${patient.id}/consultations`}>
+             <Link href={`/patients/${patient.id}/profile`}>
               <Button variant="outline" size="sm">
                 <Eye className="mr-2 h-4 w-4" /> View Records
               </Button>
@@ -212,7 +212,7 @@ export default function PatientsPage() {
   ], [user?.role]);
 
 
-  if (user?.role === 'patient') { // Patients should not access this page at all.
+  if (user?.role === 'patient') { 
     return (
       <div className="space-y-6">
         <Alert variant="destructive">
@@ -306,5 +306,3 @@ export default function PatientsPage() {
     </div>
   );
 }
-
-    
