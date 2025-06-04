@@ -11,11 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AppointmentBookingForm, type AppointmentBookingFormData } from '@/components/forms/appointment-booking-form';
-import type { Patient, DoctorSchedule, Appointment } from '@/types';
+import { AppointmentBookingForm, type AppointmentBookingFormDataType } from '@/components/forms/appointment-booking-form';
+import type { Patient, DoctorSchedule, Appointment, DayOfWeek } from '@/types';
 import { toast } from '@/hooks/use-toast';
-import { addDays, format, parseISO, startOfDay, eachMinuteOfInterval, isFuture, isBefore, getDay, setHours, setMinutes, setSeconds, setMilliseconds, addMinutes as addMinutesFn, isEqual, endOfDay as dateFnsEndOfDay } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import { addDays, format, parseISO, startOfDay, eachMinuteOfInterval, isFuture, isBefore, getDay, setHours, setMinutes, setSeconds, setMilliseconds, addMinutes as addMinutesFn, isEqual, endOfDay as dateFnsEndOfDay, isAfter } from 'date-fns';
+import { toZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -76,7 +76,7 @@ export default function PatientBookAppointmentPage() {
     setIsLoadingSlots(true);
 
     const slots: Date[] = [];
-    const dayOfWeek = format(selectedDate, 'EEEE') as typeof doctorSchedule.workingHours[number]['dayOfWeek'];
+    const dayOfWeek = format(selectedDate, 'EEEE') as DayOfWeek;
     const workingDayInfo = doctorSchedule.workingHours.find(wh => wh.dayOfWeek === dayOfWeek);
 
     if (!workingDayInfo || !workingDayInfo.isEnabled || !workingDayInfo.startTime || !workingDayInfo.endTime) {
@@ -87,19 +87,19 @@ export default function PatientBookAppointmentPage() {
 
     const slotDuration = doctorSchedule.defaultSlotDurationMinutes;
     const noticePeriodDate = doctorSchedule.noticePeriodHours
-      ? addMinutesFn(new Date(), doctorSchedule.noticePeriodHours * 60) // Convert hours to minutes
+      ? addMinutesFn(new Date(), doctorSchedule.noticePeriodHours * 60)
       : new Date();
 
     const dayStartInPH = setMilliseconds(setSeconds(setMinutes(setHours(startOfDay(selectedDate), parseInt(workingDayInfo.startTime.split(':')[0])), parseInt(workingDayInfo.startTime.split(':')[1])), 0), 0);
     const dayEndInPH = setMilliseconds(setSeconds(setMinutes(setHours(startOfDay(selectedDate), parseInt(workingDayInfo.endTime.split(':')[0])), parseInt(workingDayInfo.endTime.split(':')[1])), 0), 0);
     
     const potentialSlots = eachMinuteOfInterval(
-      { start: dayStartInPH, end: addMinutesFn(dayEndInPH, -slotDuration) }, // Ensure last slot can complete before dayEnd
+      { start: dayStartInPH, end: addMinutesFn(dayEndInPH, -slotDuration) },
       { step: slotDuration }
     );
 
     const existingAppointmentsOnDate = doctorAppointmentsForBooking.filter(app => {
-      const appDatePH = utcToZonedTime(parseISO(app.appointmentDateTimeStart), PH_TIMEZONE);
+      const appDatePH = toZonedTime(parseISO(app.appointmentDateTimeStart), PH_TIMEZONE);
       return format(appDatePH, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') && app.status === 'scheduled';
     });
     
@@ -116,20 +116,17 @@ export default function PatientBookAppointmentPage() {
     potentialSlots.forEach(slotStartPH => {
       const slotEndPH = addMinutesFn(slotStartPH, slotDuration);
 
-      // Check if slot is in the future and respects notice period
       if (!isFuture(slotStartPH) || isBefore(slotStartPH, noticePeriodDate)) {
         return;
       }
 
-      // Check if slot is within working hours
       if (isBefore(slotStartPH, dayStartInPH) || isAfter(slotEndPH, dayEndInPH)) {
         return;
       }
       
-      // Check for conflicts with existing appointments
       const conflict = existingAppointmentsOnDate.some(existingApp => {
-        const existingStartPH = utcToZonedTime(parseISO(existingApp.appointmentDateTimeStart), PH_TIMEZONE);
-        const existingEndPH = utcToZonedTime(parseISO(existingApp.appointmentDateTimeEnd), PH_TIMEZONE);
+        const existingStartPH = toZonedTime(parseISO(existingApp.appointmentDateTimeStart), PH_TIMEZONE);
+        const existingEndPH = toZonedTime(parseISO(existingApp.appointmentDateTimeEnd), PH_TIMEZONE);
         return (isBefore(slotStartPH, existingEndPH) && isAfter(slotEndPH, existingStartPH)) || isEqual(slotStartPH, existingStartPH);
       });
 
@@ -155,7 +152,7 @@ export default function PatientBookAppointmentPage() {
          setSelectedDate(undefined);
       } else {
         setSelectedDate(startOfDay(date));
-        setSelectedTimeSlot(null); // Reset time slot when date changes
+        setSelectedTimeSlot(null); 
       }
     } else {
       setSelectedDate(undefined);
@@ -163,7 +160,7 @@ export default function PatientBookAppointmentPage() {
     }
   };
 
-  const handleBookingSubmit = async (formData: AppointmentBookingFormData) => {
+  const handleBookingSubmit = async (formData: AppointmentBookingFormDataType) => {
     if (!user || !selectedDoctorId || !selectedDate || !selectedTimeSlot || !doctorSchedule) {
       setBookingError("Missing required information. Please select doctor, date, and time.");
       return;
@@ -195,8 +192,6 @@ export default function PatientBookAppointmentPage() {
       setSelectedDate(undefined);
       setSelectedTimeSlot(null);
       setAvailableSlots([]);
-      // Optionally redirect to "My Appointments" page
-      // router.push('/patient/my-appointments');
     } catch (error) {
       console.error("Error booking appointment:", error);
       const errorMessage = error instanceof Error ? error.message : "Could not book appointment. Please try again.";
@@ -369,3 +364,6 @@ export default function PatientBookAppointmentPage() {
     </div>
   );
 }
+    
+
+    

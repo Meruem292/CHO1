@@ -1,13 +1,13 @@
 
 'use client';
 
-import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole } from '@/types';
+import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole, DayOfWeek } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useAuth } from './use-auth-hook';
-import { format, parseISO, startOfDay, endOfDay, fromUnixTime, getUnixTime, addMinutes, isBefore, isAfter, isEqual, setHours, setMinutes, setSeconds, setMilliseconds, addHours, getDay, compareAsc } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import { format, parseISO, startOfDay, endOfDay, fromUnixTime, getUnixTime, addMinutes as addMinutesFn, isBefore, isAfter, isEqual, setHours, setMinutes, setSeconds, setMilliseconds, addHours, getDay, compareAsc } from 'date-fns';
+import { toZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -244,7 +244,6 @@ export function useMockDb() {
     const appointmentsQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(patientId));
     const unsubscribe = onValue(appointmentsQuery, (snapshot) => {
       const records = snapshotToArray<Appointment>(snapshot);
-      // Sort: upcoming first (by date), then past (most recent first)
       records.sort((a, b) => {
         const aDate = parseISO(a.appointmentDateTimeStart);
         const bDate = parseISO(b.appointmentDateTimeStart);
@@ -253,7 +252,7 @@ export function useMockDb() {
         if (a.status === 'scheduled' && b.status === 'scheduled') {
           return compareAsc(aDate, bDate);
         }
-        return compareAsc(bDate, aDate); // For past/cancelled, show most recent first
+        return compareAsc(bDate, aDate); 
       });
       setAppointments(records);
       setAppointmentsLoading(false);
@@ -282,13 +281,13 @@ export function useMockDb() {
   const addAppointment = useCallback(async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newAppointmentRef = push(ref(database, 'appointments'));
 
-    const patient = getPatientById(appointmentData.patientId);
-    const doctor = getPatientById(appointmentData.doctorId);
+    const patientRec = getPatientById(appointmentData.patientId);
+    const doctorRec = getPatientById(appointmentData.doctorId);
 
     const dataToSave: Omit<Appointment, 'id'> = {
       ...appointmentData,
-      patientName: patient?.name || 'Unknown Patient',
-      doctorName: doctor?.name || 'Unknown Doctor',
+      patientName: patientRec?.name || 'Unknown Patient',
+      doctorName: doctorRec?.name || 'Unknown Doctor',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -306,7 +305,7 @@ export function useMockDb() {
     if (status.startsWith('cancelled')) {
       updates.cancelledByRole = cancelledByRole;
       updates.cancellationReason = cancellationReason || (cancelledByRole === 'patient' ? 'Cancelled by patient' : 'Cancelled');
-      updates.cancelledById = user?.id; // Assuming cancellation is by the logged-in user
+      updates.cancelledById = user?.id; 
     }
     await firebaseUpdate(appointmentRef, updates);
   }, [user?.id]);
@@ -318,8 +317,10 @@ export function useMockDb() {
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
     babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, addBabyRecord, updateBabyRecord, deleteBabyRecord,
     doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
-    appointments, appointmentsLoading, getAppointmentsByPatientId, updateAppointmentStatus, // For patient's "My Appointments"
-    doctorAppointmentsForBooking, doctorAppointmentsLoading, getAppointmentsByDoctorIdForBooking, // For booking page conflict checks
+    appointments, appointmentsLoading, getAppointmentsByPatientId, updateAppointmentStatus, 
+    doctorAppointmentsForBooking, doctorAppointmentsLoading, getAppointmentsByDoctorIdForBooking, 
     addAppointment,
   };
 }
+
+    
