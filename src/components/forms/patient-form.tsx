@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { patientFormDataSchema, type PatientFormData } from '@/zod-schemas';
 import type { Patient } from '@/types';
-import { CalendarIcon, Save } from 'lucide-react';
+import { CalendarIcon, Save, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -34,8 +34,9 @@ function formatInPHTime_PPP(date: Date | string): string {
 
 interface PatientFormProps {
   patient?: Patient; 
-  onSubmit: (data: PatientFormData) => void;
+  onSubmit: (data: PatientFormData) => Promise<void>; // Make onSubmit async for parent to handle loading
   onCancel?: () => void;
+  isLoading?: boolean; // Prop to indicate if submission is in progress
 }
 
 const formStructure = [
@@ -115,7 +116,7 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
 };
 
 
-export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
+export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: PatientFormProps) {
   const form = useForm<PatientFormData>({
     resolver: zodResolver(patientFormDataSchema),
     defaultValues: getInitialFormValues(patient),
@@ -125,14 +126,14 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
     form.reset(getInitialFormValues(patient));
   }, [patient, form.reset]);
 
-  const handleSubmit = (data: PatientFormData) => {
-    onSubmit(data);
-    form.reset(getInitialFormValues(undefined));
+  const handleFormSubmit = async (data: PatientFormData) => {
+    await onSubmit(data);
+    // Removed form.reset here, parent component handles state after submission
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         <FormField
           control={form.control}
           name="dateOfBirth"
@@ -148,6 +149,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
+                      disabled={isLoading}
                     >
                       {field.value ? (
                         formatInPHTime_PPP(field.value)
@@ -188,7 +190,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                     <FormItem className={fieldConfig.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
                       <FormLabel>{fieldConfig.label}</FormLabel>
                       {fieldConfig.type === 'select' ? (
-                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <Select onValueChange={field.onChange} value={field.value || ''} disabled={isLoading}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder={fieldConfig.placeholder || "Select an option"} />
@@ -202,11 +204,11 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                         </Select>
                       ) : fieldConfig.type === 'textarea' ? (
                         <FormControl>
-                          <Textarea placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} rows={3} />
+                          <Textarea placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} rows={3} disabled={isLoading} />
                         </FormControl>
                       ) : (
                         <FormControl>
-                          <Input placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} />
+                          <Input placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} disabled={isLoading} />
                         </FormControl>
                       )}
                       <FormMessage />
@@ -220,15 +222,17 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
 
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && (
-            <Button type="button" variant="outline" onClick={() => { onCancel(); form.reset(getInitialFormValues(patient));}}>
+            <Button type="button" variant="outline" onClick={() => { onCancel(); form.reset(getInitialFormValues(patient));}} disabled={isLoading}>
               Cancel
             </Button>
           )}
-          <Button type="submit">
-            <Save className="mr-2 h-4 w-4" /> Save Patient
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isLoading ? 'Saving...' : 'Save Patient'}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
+

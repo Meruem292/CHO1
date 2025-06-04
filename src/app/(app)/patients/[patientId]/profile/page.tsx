@@ -4,12 +4,17 @@
 import React, { useState, useEffect, use } from 'react';
 import type { Patient } from '@/types';
 import { useAuth } from '@/hooks/use-auth-hook';
+import { useMockDb } from '@/hooks/use-mock-db';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, User, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Loader2, User, ShieldAlert, AlertTriangle, Edit } from 'lucide-react';
 import { parseISO } from 'date-fns';
+import { PatientForm } from '@/components/forms/patient-form';
+import type { PatientFormData } from '@/zod-schemas';
+import { toast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -34,10 +39,13 @@ interface PatientProfilePageProps {
 export default function PatientProfilePage({ params: paramsPromise }: PatientProfilePageProps) {
   const actualParams = use(paramsPromise);
   const { patientId } = actualParams;
-  const { user } = useAuth(); // Access check is handled by the layout
+  const { user } = useAuth(); 
+  const { updatePatient } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false); // Only for admin to toggle form
 
   useEffect(() => {
     if (!patientId) {
@@ -45,6 +53,7 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
       return;
     }
     setIsLoading(true);
+    setIsEditing(false); // Reset editing state on patient change
     const patientRecordRef = dbRef(database, `patients/${patientId}`);
     const unsubscribe = onValue(patientRecordRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -60,6 +69,32 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     });
     return () => unsubscribe();
   }, [patientId]);
+
+  const handleUpdatePatient = async (formData: PatientFormData) => {
+    if (!patient) return;
+    setIsUpdating(true);
+    try {
+      const name = [formData.firstName, formData.middleName, formData.lastName]
+        .filter(Boolean)
+        .join(' ');
+
+      const updatesForDb: Partial<Omit<Patient, 'id' | 'role' | 'createdAt' | 'updatedAt'>> = {
+        ...formData,
+        name,
+      };
+      // Ensure empty strings are converted to null or handled if your DB expects that
+      // For Firebase RTDB, empty strings are fine, or you can delete keys if needed.
+
+      await updatePatient(patient.id, updatesForDb);
+      toast({ title: "Patient Profile Updated", description: `${name}'s profile has been successfully updated.` });
+      setIsEditing(false); // Exit editing mode after successful update
+    } catch (error) {
+      console.error("Error updating patient profile:", error);
+      toast({ variant: "destructive", title: "Update Failed", description: "Could not update patient profile." });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -91,10 +126,43 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     ) : null
   );
 
+  // Admin view: Editable form
+  if (user?.role === 'admin' && isEditing) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Edit Patient Profile: {patient.name}</span>
+            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isUpdating}>
+              Cancel Edit
+            </Button>
+          </CardTitle>
+          <CardDescription>Update the details for {patient.name}.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PatientForm
+            patient={patient}
+            onSubmit={handleUpdatePatient}
+            isLoading={isUpdating}
+            onCancel={() => setIsEditing(false)} // Optional: PatientForm onCancel could also set isEditing to false
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Default read-only view for everyone, or admin before clicking "Edit"
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center"><User className="mr-2 h-6 w-6 text-primary" />Patient Profile Details</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Patient Profile Details</span>
+          {user?.role === 'admin' && !isEditing && (
+            <Button onClick={() => setIsEditing(true)}>
+              <Edit className="mr-2 h-4 w-4" /> Edit Profile
+            </Button>
+          )}
+        </CardTitle>
         <CardDescription>Detailed information for {patient.name}.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -128,8 +196,8 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
             <p className="text-md whitespace-pre-wrap">{patient.remarks}</p>
           </div>
         )}
-        {/* Edit button could be added here based on role */}
       </CardContent>
     </Card>
   );
 }
+
