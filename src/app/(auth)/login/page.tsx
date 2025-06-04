@@ -9,12 +9,11 @@ export default function LoginPage() {
     <Card className="w-full max-w-md shadow-xl">
       <CardHeader className="items-center text-center">
         <Image 
-          src="https://placehold.co/100x100.png" 
+          src="/app-logo.png" 
           alt="City Seal" 
           width={80} 
           height={80} 
           className="mb-4 rounded-full"
-          data-ai-hint="city seal logo" 
         />
         <CardTitle className="text-2xl font-headline text-primary">CITY HEALTH OFFICE 1</CardTitle>
       </CardHeader>
