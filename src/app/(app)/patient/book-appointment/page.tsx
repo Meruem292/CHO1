@@ -15,26 +15,25 @@ import { AppointmentBookingForm, type AppointmentBookingFormDataType } from '@/c
 import type { Patient, DoctorSchedule, Appointment, DayOfWeek } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { 
-  addDays, 
   format, 
   parseISO, 
   startOfDay, 
   eachMinuteOfInterval, 
   isFuture, 
   isBefore, 
+  isAfter,
   setHours, 
   setMinutes, 
   setSeconds, 
   setMilliseconds, 
   addMinutes as addMinutesFn, 
   isEqual,
-  endOfDay as dateFnsEndOfDay,
-  isAfter
+  endOfDay as dateFnsEndOfDay 
 } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
-// Helper to format a UTC date string or Date object into a specific format for PH_TIMEZONE
+// Helper to format a Date object or UTC string into a specific format for PH_TIMEZONE
 function formatInPHTime(date: Date | string, formatToken: 'p' | 'PPP' | 'yyyy-MM-dd' | 'EEEE'): string {
   const d = typeof date === 'string' ? parseISO(date) : date;
   if (formatToken === 'p') { // e.g., 10:00 AM
@@ -43,7 +42,7 @@ function formatInPHTime(date: Date | string, formatToken: 'p' | 'PPP' | 'yyyy-MM
   if (formatToken === 'PPP') { // e.g., Jul 15, 2024
      return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
   }
-  if (formatToken === 'yyyy-MM-dd') {
+  if (formatToken === 'yyyy-MM-dd') { // e.g., 2024-07-15
     const year = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric' }).format(d);
     const month = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, month: '2-digit' }).format(d);
     const day = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, day: '2-digit' }).format(d);
@@ -52,8 +51,7 @@ function formatInPHTime(date: Date | string, formatToken: 'p' | 'PPP' | 'yyyy-MM
   if (formatToken === 'EEEE') { // e.g., Monday
     return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, weekday: 'long' }).format(d);
   }
-  // Fallback for other/unhandled format tokens
-  return format(d, formatToken);
+  return format(d, formatToken); // Fallback, though should not be reached with defined tokens
 }
 
 // Helper to convert a Date object (representing Manila local time components) to its UTC equivalent Date object
@@ -128,7 +126,6 @@ export default function PatientBookAppointmentPage() {
     setIsLoadingSlots(true);
 
     const slots: Date[] = [];
-    // Get day of week in Manila for the selected UTC date
     const dayOfWeekInManila = formatInPHTime(selectedDate, 'EEEE') as DayOfWeek;
     const workingDayInfo = doctorSchedule.workingHours.find(wh => wh.dayOfWeek === dayOfWeekInManila);
 
@@ -139,32 +136,31 @@ export default function PatientBookAppointmentPage() {
     }
 
     const slotDuration = doctorSchedule.defaultSlotDurationMinutes;
-    // Current time + notice period, compared against Manila time
     const noticePeriodBoundary = doctorSchedule.noticePeriodHours
-      ? addMinutesFn(new Date(), doctorSchedule.noticePeriodHours * 60)
-      : new Date(); // new Date() is UTC based, comparison needs to be careful
+      ? addMinutesFn(new Date(), doctorSchedule.noticePeriodHours * 60) // This is a UTC Date
+      : new Date(0); // A very past date if no notice period, meaning all future slots are fine
 
-    // Construct day start/end times in Manila for the selected UTC date
-    // selectedDate is already start of day UTC. We need to make date objects representing start/end times in Manila time.
-    const selectedDateInManilaYear = parseInt(formatInPHTime(selectedDate, 'yyyy-MM-dd').substring(0,4));
-    const selectedDateInManilaMonth = parseInt(formatInPHTime(selectedDate, 'yyyy-MM-dd').substring(5,7)) -1; // JS month
-    const selectedDateInManilaDay = parseInt(formatInPHTime(selectedDate, 'yyyy-MM-dd').substring(8,10));
+    // Construct day start/end times using Manila date components for the selected UTC date
+    const selectedDateManilaStr = formatInPHTime(selectedDate, 'yyyy-MM-dd');
+    const selectedDateInManilaYear = parseInt(selectedDateManilaStr.substring(0,4));
+    const selectedDateInManilaMonth = parseInt(selectedDateManilaStr.substring(5,7)) -1; 
+    const selectedDateInManilaDay = parseInt(selectedDateManilaStr.substring(8,10));
 
     const dayStartManila = setMilliseconds(setSeconds(setMinutes(setHours(new Date(selectedDateInManilaYear, selectedDateInManilaMonth, selectedDateInManilaDay), parseInt(workingDayInfo.startTime.split(':')[0])), parseInt(workingDayInfo.startTime.split(':')[1])), 0), 0);
     const dayEndManila = setMilliseconds(setSeconds(setMinutes(setHours(new Date(selectedDateInManilaYear, selectedDateInManilaMonth, selectedDateInManilaDay), parseInt(workingDayInfo.endTime.split(':')[0])), parseInt(workingDayInfo.endTime.split(':')[1])), 0), 0);
     
     const potentialSlots = eachMinuteOfInterval(
-      { start: dayStartManila, end: addMinutesFn(dayEndManila, -slotDuration) },
+      { start: dayStartManila, end: addMinutesFn(dayEndManila, -slotDuration) }, // Ensure last slot can complete within working hours
       { step: slotDuration }
     );
     
     const existingAppointmentsOnDate = doctorAppointmentsForBooking.filter(app => {
-      const appDateInManila = formatInPHTime(app.appointmentDateTimeStart, 'yyyy-MM-dd');
-      return appDateInManila === formatInPHTime(selectedDate, 'yyyy-MM-dd') && app.status === 'scheduled';
+      const appDateInManila = formatInPHTime(parseISO(app.appointmentDateTimeStart), 'yyyy-MM-dd');
+      return appDateInManila === selectedDateManilaStr && app.status === 'scheduled';
     });
     
     const isUnavailableDate = doctorSchedule.unavailableDates?.some(
-      unavailableDateStr => formatInPHTime(parseISO(unavailableDateStr), 'yyyy-MM-dd') === formatInPHTime(selectedDate, 'yyyy-MM-dd')
+      unavailableDateStr => unavailableDateStr === selectedDateManilaStr
     );
 
     if (isUnavailableDate) {
@@ -173,34 +169,47 @@ export default function PatientBookAppointmentPage() {
       return;
     }
 
-    potentialSlots.forEach(slotStartManila => {
+    potentialSlots.forEach(slotStartManila => { // slotStartManila is a Date object representing Manila local time
       const slotEndManila = addMinutesFn(slotStartManila, slotDuration);
 
-      // isFuture and isBefore work on Date objects which are UTC timestamps.
-      // slotStartManila is a Date object representing Manila time.
-      // We need to compare it against noticePeriodBoundary (which is a UTC Date)
-      // as if slotStartManila was also UTC. Or convert noticePeriodBoundary to Manila time.
-      // Simpler: convert slotStartManila to its true UTC value before comparison.
+      // Convert slotStartManila to its true UTC value for notice period comparison
       const slotStartManilaAsUtc = convertManilaDateToUtcDate(slotStartManila);
       
       if (!isFuture(slotStartManilaAsUtc) || isBefore(slotStartManilaAsUtc, noticePeriodBoundary)) {
-        return;
+        return; // Slot is in the past or within notice period
       }
 
+      // Ensure slot is within doctor's working hours for the day
+      // isBefore and isAfter are strict. For start times, isEqual or isAfter. For end times, isEqual or isBefore.
+      // However, since potentialSlots are generated from dayStartManila to dayEndManila - slotDuration, they should inherently be within.
+      // This is an extra check.
       if (isBefore(slotStartManila, dayStartManila) || isAfter(slotEndManila, dayEndManila)) {
-        return;
+          return; 
       }
       
       const conflict = existingAppointmentsOnDate.some(existingApp => {
-        // existingApp times are UTC strings. Convert them to Date objects representing Manila time for comparison.
-        const existingStartUtc = parseISO(existingApp.appointmentDateTimeStart);
-        const existingEndUtc = parseISO(existingApp.appointmentDateTimeEnd);
+        const existingAppStartUTC = parseISO(existingApp.appointmentDateTimeStart);
+        const existingAppEndUTC = parseISO(existingApp.appointmentDateTimeEnd);
 
-        // Create Date objects that represent the wall-clock time in Manila
-        const existingStartManila = new Date(existingStartUtc.toLocaleString('en-US', {timeZone: PH_TIMEZONE}));
-        const existingEndManila = new Date(existingEndUtc.toLocaleString('en-US', {timeZone: PH_TIMEZONE}));
+        // Create Date objects representing Manila wall-clock time for the existing appointment
+        // This is more robust than new Date(date.toLocaleString('en-US', {timeZone: PH_TIMEZONE}))
+        const yS = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, year: 'numeric'}).format(existingAppStartUTC));
+        const mS = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, month: '2-digit'}).format(existingAppStartUTC)) -1;
+        const dS = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, day: '2-digit'}).format(existingAppStartUTC));
+        const hS = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, hour: '2-digit', hour12: false}).format(existingAppStartUTC));
+        const minS = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, minute: '2-digit'}).format(existingAppStartUTC));
+        const existingStartManilaWallClock = new Date(yS, mS, dS, hS, minS);
 
-        return (isBefore(slotStartManila, existingEndManila) && isAfter(slotEndManila, existingStartManila)) || isEqual(slotStartManila, existingStartManila);
+        const yE = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, year: 'numeric'}).format(existingAppEndUTC));
+        const mE = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, month: '2-digit'}).format(existingAppEndUTC)) -1;
+        const dE = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, day: '2-digit'}).format(existingAppEndUTC));
+        const hE = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, hour: '2-digit', hour12: false}).format(existingAppEndUTC));
+        const minE = parseInt(new Intl.DateTimeFormat('en-US', {timeZone: PH_TIMEZONE, minute: '2-digit'}).format(existingAppEndUTC));
+        const existingEndManilaWallClock = new Date(yE, mE, dE, hE, minE);
+        
+        // Check for overlap: new slot [slotStartManila, slotEndManila) vs existing [existingStartManilaWallClock, existingEndManilaWallClock)
+        // Overlap if max(start_new, start_existing) < min(end_new, end_existing)
+        return Math.max(slotStartManila.getTime(), existingStartManilaWallClock.getTime()) < Math.min(slotEndManila.getTime(), existingEndManilaWallClock.getTime());
       });
 
       if (!conflict) {
@@ -214,13 +223,13 @@ export default function PatientBookAppointmentPage() {
 
   useEffect(() => {
     calculateAvailableSlots();
-  }, [selectedDate, doctorSchedule, doctorAppointmentsForBooking, calculateAvailableSlots]);
+  }, [selectedDate, doctorSchedule, doctorAppointmentsForBooking, calculateAvailableSlots]); // Added doctorAppointmentsLoading to re-calc when they load
 
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      const todayUTC = startOfDay(new Date()); // UTC start of today
-      if (isBefore(date, todayUTC)) { // date is already start of day UTC
+      const todayUTCStartOfDay = startOfDay(new Date()); 
+      if (isBefore(date, todayUTCStartOfDay)) { 
          toast({ variant: "destructive", title: "Invalid Date", description: "Please select a future date." });
          setSelectedDate(undefined);
       } else {
@@ -241,7 +250,6 @@ export default function PatientBookAppointmentPage() {
     setIsBooking(true);
     setBookingError(null);
 
-    // selectedTimeSlot is a Date object representing Manila time components. Convert to UTC.
     const slotStartUTC = convertManilaDateToUtcDate(selectedTimeSlot);
     const slotEndUTC = convertManilaDateToUtcDate(addMinutesFn(selectedTimeSlot, doctorSchedule.defaultSlotDurationMinutes));
 
@@ -262,7 +270,8 @@ export default function PatientBookAppointmentPage() {
         description: `Your appointment with Dr. ${doctors.find(d => d.id === selectedDoctorId)?.name || 'Doctor'} on ${formatInPHTime(selectedDate, 'PPP')} at ${formatInPHTime(selectedTimeSlot, 'p')} is confirmed.`,
         variant: 'default',
       });
-      setSelectedDoctorId(null);
+      // Reset selection after successful booking
+      setSelectedDoctorId(null); 
       setSelectedDate(undefined);
       setSelectedTimeSlot(null);
       setAvailableSlots([]);
@@ -317,7 +326,15 @@ export default function PatientBookAppointmentPage() {
           ) : doctors.length === 0 ? (
             <p>No doctors available for booking at the moment.</p>
           ) : (
-            <Select onValueChange={setSelectedDoctorId} value={selectedDoctorId || undefined}>
+            <Select 
+              onValueChange={(value) => {
+                setSelectedDoctorId(value);
+                setSelectedDate(undefined); // Reset date when doctor changes
+                setSelectedTimeSlot(null);
+                setAvailableSlots([]);
+              }} 
+              value={selectedDoctorId || ""}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a doctor" />
               </SelectTrigger>
@@ -338,7 +355,7 @@ export default function PatientBookAppointmentPage() {
         </div>
       )}
 
-      {selectedDoctorId && !doctorScheduleLoading && !doctorSchedule && (
+      {selectedDoctorId && !doctorScheduleLoading && !doctorSchedule && !doctorAppointmentsLoading && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Doctor Unavailable</AlertTitle>
@@ -361,11 +378,12 @@ export default function PatientBookAppointmentPage() {
                 selected={selectedDate}
                 onSelect={handleDateSelect}
                 disabled={(date) => {
-                  if (isBefore(date, startOfDay(new Date()))) return true;
+                  if (isBefore(date, startOfDay(new Date()))) return true; // Disable past dates
                   const dayOfWeekInManila = formatInPHTime(date, 'EEEE') as DayOfWeek;
                   const workingDay = doctorSchedule.workingHours.find(wh => wh.dayOfWeek === dayOfWeekInManila);
-                  if (!workingDay || !workingDay.isEnabled) return true;
-                  return doctorSchedule.unavailableDates?.some(ud => formatInPHTime(parseISO(ud), 'yyyy-MM-dd') === formatInPHTime(date, 'yyyy-MM-dd')) || false;
+                  if (!workingDay || !workingDay.isEnabled) return true; // Disable if not a working day
+                  // Disable if it's an unavailable date for the doctor (in Manila time)
+                  return doctorSchedule.unavailableDates?.some(udStr => udStr === formatInPHTime(date, 'yyyy-MM-dd')) || false;
                 }}
                 initialFocus
               />
@@ -393,13 +411,12 @@ export default function PatientBookAppointmentPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {availableSlots.map(slot => ( // slot is a Date object representing Manila time
                       <Button
-                        key={slot.toISOString()}
+                        key={slot.toISOString()} // Ensure key is unique
                         variant={selectedTimeSlot && isEqual(slot, selectedTimeSlot) ? 'default' : 'outline'}
                         onClick={() => setSelectedTimeSlot(slot)}
                         className="w-full"
                       >
-                        {/* Display slot time in Manila format */}
-                        {new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(slot)}
+                        {formatInPHTime(slot, 'p')}
                       </Button>
                     ))}
                   </div>
@@ -435,8 +452,7 @@ export default function PatientBookAppointmentPage() {
                   isLoading={isBooking}
                   selectedDoctorName={selectedDoctorDetails?.name}
                   selectedDate={selectedDate ? formatInPHTime(selectedDate, 'PPP') : undefined}
-                  // selectedTimeSlot is a Date object representing Manila time, format it for display
-                  selectedTimeSlot={selectedTimeSlot ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(selectedTimeSlot) : undefined}
+                  selectedTimeSlot={selectedTimeSlot ? formatInPHTime(selectedTimeSlot, 'p') : undefined}
                 />
               </CardContent>
             </Card>
@@ -446,3 +462,4 @@ export default function PatientBookAppointmentPage() {
     </div>
   );
 }
+
