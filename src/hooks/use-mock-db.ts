@@ -143,13 +143,35 @@ export function useMockDb() {
 
   const addConsultation = useCallback(async (consultationData: Omit<ConsultationRecord, 'id'>) => {
     const newRef = push(ref(database, 'consultations'));
-    await set(newRef, { ...consultationData, createdAt: serverTimestamp() });
-    return { ...consultationData, id: newRef.key! } as ConsultationRecord;
-  }, []);
+    const dataToSave: Omit<ConsultationRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+         ...consultationData,
+         createdAt: serverTimestamp()
+    };
+
+    if (user && user.role === 'doctor') {
+        dataToSave.doctorId = user.id;
+        dataToSave.doctorName = user.name;
+    }
+    // If user is admin, doctorId and doctorName remain undefined or as passed in consultationData (if explicitly set)
+
+    await set(newRef, dataToSave);
+    return { ...dataToSave, id: newRef.key! } as ConsultationRecord;
+  }, [user]);
 
   const updateConsultation = useCallback(async (id: string, updates: Partial<Omit<ConsultationRecord, 'id'>>) => {
-    await firebaseUpdate(ref(database, `consultations/${id}`), { ...updates, updatedAt: serverTimestamp() });
-  }, []);
+    const dataToUpdate: Partial<Omit<ConsultationRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+        ...updates,
+        updatedAt: serverTimestamp()
+    };
+
+    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { // Only add if not already being explicitly updated
+        dataToUpdate.doctorId = user.id;
+        dataToUpdate.doctorName = user.name;
+    }
+    // If admin updates, it doesn't automatically overwrite doctorId/Name unless explicitly part of 'updates'
+
+    await firebaseUpdate(ref(database, `consultations/${id}`), dataToUpdate);
+  }, [user]);
 
   const deleteConsultation = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `consultations/${id}`));

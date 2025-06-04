@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,14 +96,26 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   }, [patientId, getConsultationsByPatientId]);
 
 
-  const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId'>) => {
-    const consultationData = { ...data, patientId };
+  const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+    const consultationBaseData = { ...data, patientId };
+    let fullConsultationData: Omit<ConsultationRecord, 'id'> = { ...consultationBaseData };
+
+    if (user && user.role === 'doctor') {
+      fullConsultationData = {
+        ...fullConsultationData,
+        doctorId: user.id,
+        doctorName: user.name,
+      };
+    }
+    
     try {
       if (editingConsultation) {
-        await updateConsultation(editingConsultation.id, consultationData);
+        // When editing, we pass the fullConsultationData which might include updated doctor info if a doctor edits.
+        // If an admin edits, doctorId/doctorName from original record are preserved unless explicitly changed in 'data'.
+        await updateConsultation(editingConsultation.id, fullConsultationData);
         toast({ title: "Consultation Updated", description: `Record for ${formatInPHTime_PPP(data.date)} updated.` });
       } else {
-        await addConsultation(consultationData);
+        await addConsultation(fullConsultationData);
         toast({ title: "Consultation Added", description: `New record for ${formatInPHTime_PPP(data.date)} added.` });
       }
       setIsFormOpen(false);
@@ -150,6 +162,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       }
     },
     {
+      accessorKey: 'doctorName',
+      header: 'Doctor',
+      cell: ({ row }) => row.original.doctorName || 'N/A',
+    },
+    {
       accessorKey: 'notes',
       header: 'Notes',
       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("notes")?.toString() || 'N/A'}</p>,
@@ -168,7 +185,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        if (user?.role === 'patient') return null; 
+        // Only allow editing/deleting if user is admin or the doctor who created the record
+        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === consultation.doctorId);
+        if (!canEdit && user?.role !== 'patient') return null; // Patients see read-only, no actions
+        if (user?.role === 'patient') return null;
+
 
         return (
           <DropdownMenu>
@@ -192,7 +213,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         );
       },
     },
-  ], [user?.role, openEditForm, setConsultationToDelete]);
+  ], [user?.role, user?.id, openEditForm, setConsultationToDelete]);
 
 
   return (
@@ -224,8 +245,8 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         <DataTable
             columns={columns}
             data={consultations}
-            filterColumnId="date" 
-            filterPlaceholder="Filter by notes or diagnosis..."
+            filterColumnId="doctorName" 
+            filterPlaceholder="Filter by doctor, notes..."
         />
       )}
 
@@ -235,6 +256,9 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <DialogTitle>{editingConsultation ? 'Edit Consultation' : 'Add New Consultation'}</DialogTitle>
             <DialogDescription>
               Manage consultation records for {patientName}.
+              {user?.role === 'doctor' && !editingConsultation && ` This record will be attributed to you, Dr. ${user.name}.`}
+              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId === user.id && ` You are editing your entry.`}
+              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingConsultation.doctorName || 'another doctor'}.`}
             </DialogDescription>
           </DialogHeader>
           <ConsultationForm
@@ -264,3 +288,4 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
+

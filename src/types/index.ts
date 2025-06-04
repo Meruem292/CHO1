@@ -50,6 +50,8 @@ export interface ConsultationRecord {
   notes: string;
   diagnosis?: string;
   treatmentPlan?: string;
+  doctorId?: string; // ID of the doctor who made the record
+  doctorName?: string; // Name of the doctor
   createdAt?: object;
   updatedAt?: object;
 }
@@ -159,3 +161,4 @@ export interface AdminBootstrapConfig {
 export interface AppointmentBookingFormData {
   reasonForVisit?: string;
 }
+
