@@ -39,6 +39,8 @@ import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
 // import Link from 'next/link'; // Link is handled by the layout
 import { parseISO } from 'date-fns';
+import { database } from '@/lib/firebase-config';
+import { ref as dbRef, onValue } from 'firebase/database';
 
 
 const PH_TIMEZONE = 'Asia/Manila';
