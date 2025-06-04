@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect } from 'react'; 
+import React, { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
@@ -33,7 +33,7 @@ function formatInPHTime_PPP(date: Date | string): string {
 }
 
 interface PatientFormProps {
-  patient?: Patient; 
+  patient?: Patient;
   onSubmit: (data: PatientFormData) => Promise<void>; // Make onSubmit async for parent to handle loading
   onCancel?: () => void;
   isLoading?: boolean; // Prop to indicate if submission is in progress
@@ -128,7 +128,6 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
 
   const handleFormSubmit = async (data: PatientFormData) => {
     await onSubmit(data);
-    // Removed form.reset here, parent component handles state after submission
   };
 
   return (
@@ -190,7 +189,7 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
                     <FormItem className={fieldConfig.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
                       <FormLabel>{fieldConfig.label}</FormLabel>
                       {fieldConfig.type === 'select' ? (
-                        <Select onValueChange={field.onChange} value={field.value || ''} disabled={isLoading}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder={fieldConfig.placeholder || "Select an option"} />
@@ -226,13 +225,12 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || !form.formState.isDirty && !!patient}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isLoading ? 'Saving...' : 'Save Patient'}
+            {isLoading ? 'Saving...' : (patient ? 'Update Patient' : 'Save Patient')}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
-
