@@ -48,7 +48,7 @@ export function useMockDb() {
   const [maternityRecords, setMaternityRecords] = useState<MaternityRecord[]>([]);
   const [maternityRecordsLoading, setMaternityRecordsLoading] = useState(true);
 
-  const [babyRecords, setBabyRecords] = useState<BabyRecord[]>([]);
+  const [babyRecords, setBabyRecords] = useState<BabyRecord[]>([]); // Shared state for general baby record viewing
   const [babyRecordsLoading, setBabyRecordsLoading] = useState(true);
 
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
@@ -219,6 +219,7 @@ export function useMockDb() {
     await firebaseRemove(ref(database, `maternityRecords/${id}`));
   }, []);
 
+  // Fetches baby records and updates shared state (used by BabyHealthPage)
   const getBabyRecordsByMotherId = useCallback((motherId: string) => {
     setBabyRecordsLoading(true);
     const recordsQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(motherId));
@@ -228,10 +229,25 @@ export function useMockDb() {
         setBabyRecordsLoading(false);
     }, (error) => {
         console.error(`Error fetching baby records for mother ${motherId}:`, error);
+        setBabyRecords([]); // Clear on error to avoid stale data
         setBabyRecordsLoading(false);
     });
     return unsubscribe;
   }, []);
+
+  // Fetches baby records for a specific mother once, without updating shared state
+  const fetchBabyRecordsForMotherOnce = useCallback(async (motherId: string): Promise<BabyRecord[]> => {
+    try {
+      const recordsQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(motherId));
+      const snapshot = await get(recordsQuery);
+      const records = snapshotToArray<BabyRecord>(snapshot);
+      return records.sort((a, b) => new Date(b.birthDate).getTime() - new Date(a.birthDate).getTime());
+    } catch (error) {
+      console.error(`Error fetching baby records once for mother ${motherId}:`, error);
+      return [];
+    }
+  }, []);
+
 
   const addBabyRecord = useCallback(async (recordData: Omit<BabyRecord, 'id'>) => {
     const newRef = push(ref(database, 'babyRecords'));
@@ -439,7 +455,7 @@ export function useMockDb() {
     patients, patientsLoading, getPatients, getPatientById, addPatient, updatePatient, deletePatient,
     consultations, consultationsLoading, getConsultationsByPatientId, addConsultation, updateConsultation, deleteConsultation,
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
-    babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, addBabyRecord, updateBabyRecord, deleteBabyRecord,
+    babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, fetchBabyRecordsForMotherOnce, addBabyRecord, updateBabyRecord, deleteBabyRecord,
     doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
     allDoctorSchedules, allDoctorSchedulesLoading, getAllDoctorSchedules,
     appointments, appointmentsLoading, getAppointmentsByPatientId, getAppointmentsByDoctorId, updateAppointmentStatus,
@@ -449,4 +465,3 @@ export function useMockDb() {
   };
 }
 
-    

@@ -95,6 +95,17 @@ export const consultationSchema = z.object({
   notes: z.string().min(10, { message: "Notes must be at least 10 characters." }),
   diagnosis: z.string().optional(),
   treatmentPlan: z.string().optional(),
+  subjectType: z.enum(['mother', 'baby']).optional().default('mother'),
+  babyId: z.string().optional(),
+  babyName: z.string().optional(), // This will be populated programmatically, not by user input usually
+}).superRefine((data, ctx) => {
+  if (data.subjectType === 'baby' && !data.babyId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please select a baby if the consultation is for a baby.",
+      path: ["babyId"],
+    });
+  }
 });
 
 export const maternityHistorySchema = z.object({
@@ -175,3 +186,4 @@ export const appointmentBookingFormSchema = z.object({
   reasonForVisit: z.string().max(500, "Reason is too long.").optional(),
 });
 export type AppointmentBookingFormData = z.infer<typeof appointmentBookingFormSchema>;
+

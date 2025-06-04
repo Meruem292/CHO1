@@ -37,7 +37,7 @@ import { format, parseISO, isFuture } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ConsultationForm } from '@/components/forms/consultation-form';
-import type { consultationSchema as consultationFormSchemaType } from '@/zod-schemas';
+import { consultationSchema as consultationFormSchemaType } from '@/zod-schemas';
 import type * as z from 'zod';
 
 const PH_TIMEZONE = 'Asia/Manila';
@@ -148,14 +148,15 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     setIsConsultationFormOpen(true);
   };
 
-  const handleConsultationSubmit = async (data: Omit<z.infer<typeof consultationFormSchemaType>, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+  const handleConsultationSubmit = async (data: z.infer<typeof consultationFormSchemaType>) => {
     if (!selectedAppointmentForConsultation || !currentUser || currentUser.role !== 'doctor') {
       toast({ variant: "destructive", title: "Error", description: "Cannot submit consultation. Invalid context." });
       return;
     }
 
+    // Ensure patientId is the mother's ID from the appointment
     const consultationPayload: Omit<ConsultationRecord, 'id'> = {
-      ...data,
+      ...data, // This now includes subjectType, babyId, babyName if applicable from the form
       patientId: selectedAppointmentForConsultation.patientId,
       // doctorId and doctorName will be set by addConsultation if currentUser is a doctor
     };
@@ -163,7 +164,8 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     try {
       await addConsultation(consultationPayload);
       await updateAppointmentStatus(selectedAppointmentForConsultation.id, 'completed', currentUser.role);
-      toast({ title: "Consultation Saved & Appointment Completed", description: `Consultation for ${selectedAppointmentForConsultation.patientName} has been saved and the appointment marked as completed.` });
+      const subjectName = data.subjectType === 'baby' && data.babyName ? data.babyName : selectedAppointmentForConsultation.patientName;
+      toast({ title: "Consultation Saved & Appointment Completed", description: `Consultation for ${subjectName} has been saved and the appointment marked as completed.` });
       setIsConsultationFormOpen(false);
       setSelectedAppointmentForConsultation(null);
     } catch (error) {
@@ -230,7 +232,10 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         
         const showCancelButton = canManageThisAppointment(appointment) && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
         const showViewPatientRecordsButton = (currentUser?.role === 'admin' || (currentUser?.role === 'doctor' && currentUser.id === viewingUserId)) && viewingUser?.role === 'doctor' && appointment.patientId;
-        const showStartConsultationButton = currentUser?.role === 'doctor' && currentUser.id === appointment.doctorId && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
+        // Show Start Consultation button if current user is the doctor for this appointment AND status is 'scheduled' (future or past)
+        // (Can add consultation for past scheduled appointments that were missed)
+        const showStartConsultationButton = currentUser?.role === 'doctor' && currentUser.id === appointment.doctorId && appointment.status === 'scheduled';
+
 
         return (
           <div className="flex space-x-2">
@@ -372,6 +377,9 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
                 <ConsultationForm
                     onSubmit={handleConsultationSubmit}
                     onCancel={() => { setIsConsultationFormOpen(false); setSelectedAppointmentForConsultation(null);}}
+                    showSubjectSelection={true}
+                    motherId={selectedAppointmentForConsultation.patientId}
+                    motherName={selectedAppointmentForConsultation.patientName}
                 />
             </DialogContent>
         </Dialog>

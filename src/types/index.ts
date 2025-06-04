@@ -45,13 +45,16 @@ export interface Patient extends PatientFormData {
 
 export interface ConsultationRecord {
   id: string;
-  patientId: string;
+  patientId: string; // This will always be the mother's ID
   date: string;
   notes: string;
   diagnosis?: string;
   treatmentPlan?: string;
   doctorId?: string; // ID of the doctor who made the record
   doctorName?: string; // Name of the doctor
+  subjectType?: 'mother' | 'baby'; // Indicates if the consultation is for the mother or a baby
+  babyId?: string; // ID of the baby if subjectType is 'baby'
+  babyName?: string; // Name of the baby if subjectType is 'baby'
   createdAt?: object;
   updatedAt?: object;
 }
@@ -72,7 +75,7 @@ export interface MaternityRecord {
 export interface BabyRecord {
   id: string;
   motherId: string;
-  name?: string;
+  name?: string; // Baby's name
   birthDate: string;
   birthWeight?: string;
   birthLength?: string;

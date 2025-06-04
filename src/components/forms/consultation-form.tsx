@@ -1,6 +1,7 @@
 
 'use client';
 
+import React, { useState, useEffect, useCallback } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
@@ -16,12 +17,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { consultationSchema } from '@/zod-schemas';
-import type { ConsultationRecord } from '@/types';
-import { CalendarIcon, Save } from 'lucide-react';
+import type { ConsultationRecord, BabyRecord } from '@/types';
+import { CalendarIcon, Save, User, Baby as BabyIcon, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
+import { useMockDb } from '@/hooks/use-mock-db'; // To fetch babies
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -31,30 +35,159 @@ function formatInPHTime_PPP(date: Date | string): string {
 }
 
 interface ConsultationFormProps {
-  consultation?: ConsultationRecord;
-  onSubmit: (data: Omit<z.infer<typeof consultationSchema>, 'id' | 'patientId'>) => void;
+  consultation?: Partial<ConsultationRecord>; // Make it partial for new entries
+  onSubmit: (data: z.infer<typeof consultationSchema>) => void;
   onCancel?: () => void;
+  showSubjectSelection?: boolean;
+  motherId?: string; // Required if showSubjectSelection is true
+  motherName?: string; // For display
 }
 
-export function ConsultationForm({ consultation, onSubmit, onCancel }: ConsultationFormProps) {
+export function ConsultationForm({
+  consultation,
+  onSubmit,
+  onCancel,
+  showSubjectSelection = false,
+  motherId,
+  motherName,
+}: ConsultationFormProps) {
   const form = useForm<z.infer<typeof consultationSchema>>({
     resolver: zodResolver(consultationSchema),
-    defaultValues: consultation || {
-      date: new Date().toISOString().split('T')[0],
-      notes: '',
-      diagnosis: '',
-      treatmentPlan: '',
+    defaultValues: {
+      date: consultation?.date || new Date().toISOString().split('T')[0],
+      notes: consultation?.notes || '',
+      diagnosis: consultation?.diagnosis || '',
+      treatmentPlan: consultation?.treatmentPlan || '',
+      subjectType: consultation?.subjectType || 'mother',
+      babyId: consultation?.babyId || undefined,
+      babyName: consultation?.babyName || undefined,
     },
   });
 
+  const { fetchBabyRecordsForMotherOnce } = useMockDb();
+  const [babiesList, setBabiesList] = useState<BabyRecord[]>([]);
+  const [isLoadingBabies, setIsLoadingBabies] = useState(false);
+
+  const subjectType = form.watch('subjectType');
+
+  useEffect(() => {
+    if (showSubjectSelection && subjectType === 'baby' && motherId) {
+      setIsLoadingBabies(true);
+      fetchBabyRecordsForMotherOnce(motherId)
+        .then(setBabiesList)
+        .catch(console.error)
+        .finally(() => setIsLoadingBabies(false));
+    } else {
+      setBabiesList([]);
+    }
+  }, [showSubjectSelection, subjectType, motherId, fetchBabyRecordsForMotherOnce]);
+
+  // Reset babyId if subjectType changes from 'baby' to 'mother'
+  useEffect(() => {
+    if (subjectType === 'mother') {
+      form.setValue('babyId', undefined);
+      form.setValue('babyName', undefined);
+    }
+  }, [subjectType, form]);
+
+
   const handleSubmit = (data: z.infer<typeof consultationSchema>) => {
-    onSubmit(data);
-    form.reset({ date: new Date().toISOString().split('T')[0], notes: '', diagnosis: '', treatmentPlan: '' });
+    let finalData = { ...data };
+    if (data.subjectType === 'baby' && data.babyId) {
+      const selectedBaby = babiesList.find(b => b.id === data.babyId);
+      finalData.babyName = selectedBaby?.name || 'Selected Baby';
+    } else {
+      finalData.babyId = undefined;
+      finalData.babyName = undefined;
+    }
+    onSubmit(finalData);
+     // Resetting form after submit if it's a new record
+    if (!consultation?.id) {
+       form.reset({ 
+        date: new Date().toISOString().split('T')[0], 
+        notes: '', diagnosis: '', 
+        treatmentPlan: '',
+        subjectType: showSubjectSelection ? 'mother' : undefined,
+        babyId: undefined,
+        babyName: undefined,
+      });
+    }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {showSubjectSelection && motherName && (
+          <FormField
+            control={form.control}
+            name="subjectType"
+            render={({ field }) => (
+              <FormItem className="space-y-3">
+                <FormLabel>Consultation For:</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex flex-col space-y-1"
+                  >
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="mother" />
+                      </FormControl>
+                      <FormLabel className="font-normal flex items-center">
+                        <User className="mr-2 h-4 w-4 text-muted-foreground" /> {motherName} (Mother)
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="baby" />
+                      </FormControl>
+                      <FormLabel className="font-normal flex items-center">
+                        <BabyIcon className="mr-2 h-4 w-4 text-muted-foreground" /> A Baby
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {showSubjectSelection && subjectType === 'baby' && (
+          <FormField
+            control={form.control}
+            name="babyId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Select Baby</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger disabled={isLoadingBabies}>
+                      {isLoadingBabies ? (
+                        <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading babies...</span>
+                      ) : (
+                        <SelectValue placeholder="Select the baby" />
+                      )}
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {!isLoadingBabies && babiesList.length === 0 && (
+                      <SelectItem value="no-babies" disabled>No babies found for this mother.</SelectItem>
+                    )}
+                    {babiesList.map((baby) => (
+                      <SelectItem key={baby.id} value={baby.id}>
+                        {baby.name || `Baby (Born: ${formatInPHTime_PPP(baby.birthDate)})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="date"
@@ -139,8 +272,9 @@ export function ConsultationForm({ consultation, onSubmit, onCancel }: Consultat
               Cancel
             </Button>
           )}
-          <Button type="submit">
-            <Save className="mr-2 h-4 w-4" /> Save Consultation
+          <Button type="submit" disabled={showSubjectSelection && subjectType === 'baby' && isLoadingBabies}>
+            <Save className="mr-2 h-4 w-4" /> 
+            {consultation?.id ? 'Update Consultation' : 'Save Consultation'}
           </Button>
         </div>
       </form>
