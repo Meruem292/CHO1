@@ -133,8 +133,8 @@ export interface Appointment {
   patientName: string;
   doctorId: string;
   doctorName: string;
-  appointmentDateTimeStart: string; // ISO String or Firebase Timestamp
-  appointmentDateTimeEnd: string; // ISO String or Firebase Timestamp
+  appointmentDateTimeStart: string; // ISO String (UTC)
+  appointmentDateTimeEnd: string; // ISO String (UTC)
   durationMinutes: number;
   status: AppointmentStatus;
   reasonForVisit?: string;
@@ -153,4 +153,9 @@ export interface AdminBootstrapConfig {
   email: string;
   password: string;
   name?: string;
+}
+
+// For the appointment booking form
+export interface AppointmentBookingFormData {
+  reasonForVisit?: string;
 }

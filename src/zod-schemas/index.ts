@@ -163,7 +163,6 @@ export const workingDaySchema = z.object({
 });
 
 export const doctorScheduleSchema = z.object({
-  // id: z.string().min(1, "ID is required."), // This will be the Firebase key
   doctorId: z.string().min(1, "Doctor ID is required."),
   workingHours: z.array(workingDaySchema).length(7, "Must have 7 working day entries."),
   unavailableDates: z.array(z.string().date("Invalid date format for unavailable date.")).optional(),
@@ -171,3 +170,8 @@ export const doctorScheduleSchema = z.object({
   noticePeriodHours: z.coerce.number().int().nonnegative({ message: "Notice period cannot be negative." }).optional(),
 });
 export type DoctorScheduleFormData = z.infer<typeof doctorScheduleSchema>;
+
+export const appointmentBookingFormSchema = z.object({
+  reasonForVisit: z.string().max(500, "Reason is too long.").optional(),
+});
+export type AppointmentBookingFormData = z.infer<typeof appointmentBookingFormSchema>;

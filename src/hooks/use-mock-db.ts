@@ -1,11 +1,15 @@
 
 'use client';
 
-import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule } from '@/types';
+import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
-import { useAuth } from './use-auth-hook'; // To get current user for potential filtering/rules
+import { useAuth } from './use-auth-hook';
+import { format, parseISO, startOfDay, endOfDay, fromUnixTime, getUnixTime, addMinutes, isBefore, isAfter, isEqual, setHours, setMinutes, setSeconds, setMilliseconds, addHours, getDay, compareAsc } from 'date-fns';
+import { utcToZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+
+const PH_TIMEZONE = 'Asia/Manila';
 
 // Helper to transform Firebase snapshot to array
 const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
@@ -19,14 +23,14 @@ const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
 
 
 export function useMockDb() {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(true);
 
   const [consultations, setConsultations] = useState<ConsultationRecord[]>([]);
   const [consultationsLoading, setConsultationsLoading] = useState(true);
-  
+
   const [maternityRecords, setMaternityRecords] = useState<MaternityRecord[]>([]);
   const [maternityRecordsLoading, setMaternityRecordsLoading] = useState(true);
 
@@ -36,8 +40,14 @@ export function useMockDb() {
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
   const [doctorScheduleLoading, setDoctorScheduleLoading] = useState(true);
 
+  const [appointments, setAppointments] = useState<Appointment[]>([]); // For patient's "My Appointments"
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true); // For patient's "My Appointments"
 
-  // Fetch all patients
+  const [doctorAppointmentsForBooking, setDoctorAppointmentsForBooking] = useState<Appointment[]>([]);
+  const [doctorAppointmentsLoading, setDoctorAppointmentsLoading] = useState(true);
+
+
+  // Fetch all patients/users
   useEffect(() => {
     const patientsRef = ref(database, 'patients');
     const unsubscribe = onValue(patientsRef, (snapshot) => {
@@ -52,12 +62,15 @@ export function useMockDb() {
 
   // Patient operations
   const getPatients = useCallback(() => patients, [patients]);
-  const getPatientById = useCallback((id: string) => patients.find(p => p.id === id), [patients]);
+  const getPatientById = useCallback((id: string): Patient | undefined => patients.find(p => p.id === id), [patients]);
 
-  const addPatient = useCallback(async (patientData: Omit<Patient, 'id'>) => {
+
+  const addPatient = useCallback(async (patientData: Omit<Patient, 'id' | 'role'>) => {
     const newPatientRef = push(ref(database, 'patients'));
-    await set(newPatientRef, { ...patientData, createdAt: serverTimestamp() });
-    return { ...patientData, id: newPatientRef.key! } as Patient;
+    // Ensure role is 'patient' if not specified by an admin creation flow
+    const dataToSave: Omit<Patient, 'id'> = { ...patientData, role: 'patient', createdAt: serverTimestamp() };
+    await set(newPatientRef, dataToSave);
+    return { ...dataToSave, id: newPatientRef.key! } as Patient;
   }, []);
 
   const updatePatient = useCallback(async (id: string, updates: Partial<Omit<Patient, 'id'>>) => {
@@ -85,6 +98,20 @@ export function useMockDb() {
             firebaseRemove(childSnapshot.ref);
         });
     }, { onlyOnce: true });
+    // Also delete appointments associated with this patient
+    const appointmentsAsPatientQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(id));
+    onValue(appointmentsAsPatientQuery, (snapshot) => {
+      snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
+    }, { onlyOnce: true });
+    // If the deleted user was a doctor, also delete their appointments as a doctor
+     const appointmentsAsDoctorQuery = query(ref(database, 'appointments'), orderByChild('doctorId'), equalTo(id));
+    onValue(appointmentsAsDoctorQuery, (snapshot) => {
+      snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
+    }, { onlyOnce: true });
+    // Delete doctor schedule if they were a doctor
+    const doctorScheduleRef = ref(database, `doctorSchedules/${id}`);
+    firebaseRemove(doctorScheduleRef);
+
 
   }, []);
 
@@ -101,7 +128,7 @@ export function useMockDb() {
         console.error(`Error fetching consultations for patient ${patientId}:`, error);
         setConsultationsLoading(false);
     });
-    return unsubscribe; 
+    return unsubscribe;
   }, []);
 
   const addConsultation = useCallback(async (consultationData: Omit<ConsultationRecord, 'id'>) => {
@@ -133,7 +160,7 @@ export function useMockDb() {
     });
     return unsubscribe;
   }, []);
-  
+
   const addMaternityRecord = useCallback(async (recordData: Omit<MaternityRecord, 'id'>) => {
     const newRef = push(ref(database, 'maternityRecords'));
     await set(newRef, { ...recordData, createdAt: serverTimestamp() });
@@ -186,11 +213,12 @@ export function useMockDb() {
       if (snapshot.exists()) {
         setDoctorSchedule({ ...snapshot.val(), id: doctorId, doctorId: doctorId } as DoctorSchedule);
       } else {
-        setDoctorSchedule(null); // No schedule found for this doctor
+        setDoctorSchedule(null);
       }
       setDoctorScheduleLoading(false);
     }, (error) => {
       console.error(`Error fetching schedule for doctor ${doctorId}:`, error);
+      setDoctorSchedule(null);
       setDoctorScheduleLoading(false);
     });
     return unsubscribe;
@@ -202,7 +230,6 @@ export function useMockDb() {
       ...scheduleData,
       updatedAt: serverTimestamp(),
     };
-    // If it's a new schedule, also set createdAt
     const snapshot = await get(scheduleRef);
     if (!snapshot.exists()) {
       dataToSave.createdAt = serverTimestamp();
@@ -211,6 +238,79 @@ export function useMockDb() {
     return { ...scheduleData, id: scheduleData.doctorId } as DoctorSchedule;
   }, []);
 
+  // Appointment Operations
+  const getAppointmentsByPatientId = useCallback((patientId: string) => {
+    setAppointmentsLoading(true);
+    const appointmentsQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(patientId));
+    const unsubscribe = onValue(appointmentsQuery, (snapshot) => {
+      const records = snapshotToArray<Appointment>(snapshot);
+      // Sort: upcoming first (by date), then past (most recent first)
+      records.sort((a, b) => {
+        const aDate = parseISO(a.appointmentDateTimeStart);
+        const bDate = parseISO(b.appointmentDateTimeStart);
+        if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
+        if (a.status !== 'scheduled' && b.status === 'scheduled') return 1;
+        if (a.status === 'scheduled' && b.status === 'scheduled') {
+          return compareAsc(aDate, bDate);
+        }
+        return compareAsc(bDate, aDate); // For past/cancelled, show most recent first
+      });
+      setAppointments(records);
+      setAppointmentsLoading(false);
+    }, (error) => {
+      console.error(`Error fetching appointments for patient ${patientId}:`, error);
+      setAppointmentsLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const getAppointmentsByDoctorIdForBooking = useCallback((doctorId: string) => {
+    setDoctorAppointmentsLoading(true);
+    const appointmentsQuery = query(ref(database, 'appointments'), orderByChild('doctorId'), equalTo(doctorId));
+    const unsubscribe = onValue(appointmentsQuery, (snapshot) => {
+        const records = snapshotToArray<Appointment>(snapshot);
+        setDoctorAppointmentsForBooking(records);
+        setDoctorAppointmentsLoading(false);
+    }, (error) => {
+        console.error(`Error fetching appointments for doctor ${doctorId} (for booking):`, error);
+        setDoctorAppointmentsForBooking([]);
+        setDoctorAppointmentsLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const addAppointment = useCallback(async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newAppointmentRef = push(ref(database, 'appointments'));
+
+    const patient = getPatientById(appointmentData.patientId);
+    const doctor = getPatientById(appointmentData.doctorId);
+
+    const dataToSave: Omit<Appointment, 'id'> = {
+      ...appointmentData,
+      patientName: patient?.name || 'Unknown Patient',
+      doctorName: doctor?.name || 'Unknown Doctor',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await set(newAppointmentRef, dataToSave);
+    return { ...dataToSave, id: newAppointmentRef.key! } as Appointment;
+  }, [getPatientById]);
+
+  const updateAppointmentStatus = useCallback(async (appointmentId: string, status: AppointmentStatus, cancelledByRole?: UserRole, cancellationReason?: string) => {
+    const appointmentRef = ref(database, `appointments/${appointmentId}`);
+    const updates: Partial<Appointment> = {
+      status,
+      updatedAt: serverTimestamp(),
+    };
+    if (status.startsWith('cancelled')) {
+      updates.cancelledByRole = cancelledByRole;
+      updates.cancellationReason = cancellationReason || (cancelledByRole === 'patient' ? 'Cancelled by patient' : 'Cancelled');
+      updates.cancelledById = user?.id; // Assuming cancellation is by the logged-in user
+    }
+    await firebaseUpdate(appointmentRef, updates);
+  }, [user?.id]);
+
 
   return {
     patients, patientsLoading, getPatients, getPatientById, addPatient, updatePatient, deletePatient,
@@ -218,5 +318,8 @@ export function useMockDb() {
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
     babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, addBabyRecord, updateBabyRecord, deleteBabyRecord,
     doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
+    appointments, appointmentsLoading, getAppointmentsByPatientId, updateAppointmentStatus, // For patient's "My Appointments"
+    doctorAppointmentsForBooking, doctorAppointmentsLoading, getAppointmentsByDoctorIdForBooking, // For booking page conflict checks
+    addAppointment,
   };
 }
