@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { AppLogo } from '@/components/icons/app-logo';
 import { UserNav } from '@/components/layout/user-nav';
@@ -7,7 +8,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
+      <div className="container px-4 md:px-6 lg:px-8 flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
         <div className="flex items-center gap-2">
           <div className="md:hidden">
             <SidebarTrigger />
