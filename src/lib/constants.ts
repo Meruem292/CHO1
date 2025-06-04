@@ -49,6 +49,12 @@ export const NAV_ITEMS: NavItem[] = [
   },
   // Doctor Specific
   {
+    href: '/patients', // Doctors view their associated patients
+    label: 'My Associated Patients',
+    icon: Users,
+    roles: ['doctor'],
+  },
+  {
     href: '/doctor/my-schedule', // Doctor manages their own schedule
     label: 'My Schedule',
     icon: CalendarPlus,

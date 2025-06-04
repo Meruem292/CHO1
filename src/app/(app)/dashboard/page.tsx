@@ -114,14 +114,14 @@ export default function DashboardPage() {
   }
 
   // Patient/Doctor Dashboard
-  const totalPatientsForDoctor = user.role === 'doctor' ? patients.filter((p: Patient) => p.role === 'patient').length : 0; // Simplified for doctor role
+  const totalPatientsInSystem = patients.filter((p: Patient) => p.role === 'patient').length; 
   
   const stats = user.role === 'patient' ? [
     { title: "My Consultations", value: myConsultationsCount, icon: ClipboardList, href: `/patients/${user.id}/consultations`, loading: consultationsLoading },
     { title: "My Maternity Records", value: myMaternityRecordsCount, icon: Baby, href: `/patients/${user.id}/maternity-history`, loading: maternityRecordsLoading },
     { title: "My Baby's Records", value: myBabyRecordsCount, icon: HeartPulse, href: `/patients/${user.id}/baby-health`, loading: patientBabyRecordsLoading },
-  ] : user.role === 'doctor' ? [ // Basic cards for doctor
-    { title: "Total Patients in System", value: totalPatientsForDoctor, icon: Users, href: "/patients", loading: patientsLoading },
+  ] : user.role === 'doctor' ? [
+    { title: "Total Patients in System", value: totalPatientsInSystem, icon: Users, href: "/patients", loading: patientsLoading },
     // More doctor-specific stats could be added here if needed
   ] : []; // Should not reach here for admin, but as a fallback
 
