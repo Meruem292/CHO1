@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import type { Appointment, Patient, UserRole, AppointmentStatus } from '@/types';
+import type { Appointment, Patient, UserRole, AppointmentStatus, ConsultationRecord } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock, Eye } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock, Eye, ClipboardList } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -28,6 +36,9 @@ import { ref as dbRef, onValue } from 'firebase/database';
 import { format, parseISO, isFuture } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ConsultationForm } from '@/components/forms/consultation-form';
+import type { consultationSchema as consultationFormSchemaType } from '@/zod-schemas';
+import type * as z from 'zod';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -64,12 +75,16 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     getAppointmentsByPatientId,
     getAppointmentsByDoctorId,
     updateAppointmentStatus,
+    addConsultation,
   } = useMockDb();
 
   const [viewingUser, setViewingUser] = useState<Patient | undefined>(undefined);
   const [viewingUserLoading, setViewingUserLoading] = useState(true);
   const [appointmentToCancel, setAppointmentToCancel] = useState<Appointment | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
+
+  const [isConsultationFormOpen, setIsConsultationFormOpen] = useState(false);
+  const [selectedAppointmentForConsultation, setSelectedAppointmentForConsultation] = useState<Appointment | null>(null);
 
   useEffect(() => {
     if (viewingUserId) {
@@ -128,6 +143,36 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     }
   };
 
+  const handleOpenConsultationForm = (appointment: Appointment) => {
+    setSelectedAppointmentForConsultation(appointment);
+    setIsConsultationFormOpen(true);
+  };
+
+  const handleConsultationSubmit = async (data: Omit<z.infer<typeof consultationFormSchemaType>, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+    if (!selectedAppointmentForConsultation || !currentUser || currentUser.role !== 'doctor') {
+      toast({ variant: "destructive", title: "Error", description: "Cannot submit consultation. Invalid context." });
+      return;
+    }
+
+    const consultationPayload: Omit<ConsultationRecord, 'id'> = {
+      ...data,
+      patientId: selectedAppointmentForConsultation.patientId,
+      // doctorId and doctorName will be set by addConsultation if currentUser is a doctor
+    };
+
+    try {
+      await addConsultation(consultationPayload);
+      await updateAppointmentStatus(selectedAppointmentForConsultation.id, 'completed', currentUser.role);
+      toast({ title: "Consultation Saved & Appointment Completed", description: `Consultation for ${selectedAppointmentForConsultation.patientName} has been saved and the appointment marked as completed.` });
+      setIsConsultationFormOpen(false);
+      setSelectedAppointmentForConsultation(null);
+    } catch (error) {
+      console.error("Error submitting consultation or updating appointment:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save consultation or update appointment status." });
+    }
+  };
+
+
   const columns: ColumnDef<Appointment>[] = useMemo(() => [
     {
       id: 'dateTime',
@@ -185,6 +230,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         
         const showCancelButton = canManageThisAppointment(appointment) && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
         const showViewPatientRecordsButton = (currentUser?.role === 'admin' || (currentUser?.role === 'doctor' && currentUser.id === viewingUserId)) && viewingUser?.role === 'doctor' && appointment.patientId;
+        const showStartConsultationButton = currentUser?.role === 'doctor' && currentUser.id === appointment.doctorId && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
 
         return (
           <div className="flex space-x-2">
@@ -194,6 +240,11 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
                   <Eye className="mr-2 h-4 w-4" /> Patient Records
                 </Button>
               </Link>
+            )}
+            {showStartConsultationButton && (
+              <Button variant="default" size="sm" onClick={() => handleOpenConsultationForm(appointment)}>
+                <ClipboardList className="mr-2 h-4 w-4" /> Start Consultation
+              </Button>
             )}
             {showCancelButton && (
               <AlertDialog>
@@ -208,7 +259,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         );
       },
     },
-  ], [viewingUser?.role, currentUser, viewingUserId]);
+  ], [viewingUser?.role, currentUser, viewingUserId, addConsultation, updateAppointmentStatus]);
 
   if (viewingUserLoading || (viewingUser && appointmentsLoading && userSpecificAppointments.length === 0 && !viewingUser)) {
     return (
@@ -308,6 +359,24 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {selectedAppointmentForConsultation && (
+        <Dialog open={isConsultationFormOpen} onOpenChange={(open) => { if(!open) { setIsConsultationFormOpen(false); setSelectedAppointmentForConsultation(null);}}}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Consultation for {selectedAppointmentForConsultation.patientName}</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details for the consultation. Saving this will mark the appointment as completed.
+                    </DialogDescription>
+                </DialogHeader>
+                <ConsultationForm
+                    onSubmit={handleConsultationSubmit}
+                    onCancel={() => { setIsConsultationFormOpen(false); setSelectedAppointmentForConsultation(null);}}
+                />
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
+
