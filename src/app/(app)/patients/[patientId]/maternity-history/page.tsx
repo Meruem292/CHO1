@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
-import type { MaternityRecord, Patient, Appointment } from '@/types';
+import type { MaternityRecord, Patient, Appointment, BabyRecord } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle, UserMdIcon } from 'lucide-react'; 
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle, UserMdIcon, HeartPulse } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MaternityHistoryForm } from '@/components/forms/maternity-history-form';
+import { BabyHealthForm } from '@/components/forms/baby-health-form'; // Import BabyHealthForm
+import type { babyHealthSchema as babyHealthFormSchemaType } from '@/zod-schemas'; // For BabyHealthForm submit type
+import type * as z from 'zod'; // For BabyHealthForm submit type
 import { toast } from '@/hooks/use-toast';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -72,13 +75,18 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     getMaternityHistoryByPatientId, 
     addMaternityRecord, 
     updateMaternityRecord, 
-    deleteMaternityRecord 
+    deleteMaternityRecord,
+    addBabyRecord // For registering a new baby
   } = useMockDb();
 
   const [patientName, setPatientName] = useState<string>('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<MaternityRecord | undefined>(undefined);
-  const [recordToDelete, setRecordToDelete] = useState<MaternityRecord | null>(null);
+  const [isMaternityFormOpen, setIsMaternityFormOpen] = useState(false);
+  const [editingMaternityRecord, setEditingMaternityRecord] = useState<MaternityRecord | undefined>(undefined);
+  const [maternityRecordToDelete, setMaternityRecordToDelete] = useState<MaternityRecord | null>(null);
+
+  // State for Baby Registration Dialog
+  const [isRegisterBabyFormOpen, setIsRegisterBabyFormOpen] = useState(false);
+
 
   useEffect(() => {
     const patientRecordRef = dbRef(database, `patients/${patientId}/name`);
@@ -93,7 +101,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
   }, [patientId, getMaternityHistoryByPatientId]);
 
 
-  const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+  const handleMaternityFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
     const recordBaseData = { ...data, patientId };
     let fullRecordData: Omit<MaternityRecord, 'id'> = { ...recordBaseData };
 
@@ -106,40 +114,62 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     }
 
     try {
-      if (editingRecord) {
-        await updateMaternityRecord(editingRecord.id, fullRecordData);
+      if (editingMaternityRecord) {
+        await updateMaternityRecord(editingMaternityRecord.id, fullRecordData);
         toast({ title: "Maternity Record Updated", description: `Pregnancy #${data.pregnancyNumber} record updated.` });
       } else {
         await addMaternityRecord(fullRecordData);
         toast({ title: "Maternity Record Added", description: `Pregnancy #${data.pregnancyNumber} record added.` });
       }
-      setIsFormOpen(false);
-      setEditingRecord(undefined);
+      setIsMaternityFormOpen(false);
+      setEditingMaternityRecord(undefined);
     } catch (error) {
       console.error("Error submitting maternity record:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to save maternity record." });
     }
   };
 
-  const openEditForm = (record: MaternityRecord) => {
-    setEditingRecord(record);
-    setIsFormOpen(true);
+  const openEditMaternityForm = (record: MaternityRecord) => {
+    setEditingMaternityRecord(record);
+    setIsMaternityFormOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (recordToDelete) {
+  const handleDeleteMaternityConfirm = async () => {
+    if (maternityRecordToDelete) {
       try {
-        await deleteMaternityRecord(recordToDelete.id);
-        toast({ title: "Maternity Record Deleted", description: `Pregnancy #${recordToDelete.pregnancyNumber} record deleted.` });
-        setRecordToDelete(null);
+        await deleteMaternityRecord(maternityRecordToDelete.id);
+        toast({ title: "Maternity Record Deleted", description: `Pregnancy #${maternityRecordToDelete.pregnancyNumber} record deleted.` });
+        setMaternityRecordToDelete(null);
       } catch (error) {
         console.error("Error deleting maternity record:", error);
         toast({ variant: "destructive", title: "Error", description: "Failed to delete maternity record." });
       }
     }
   };
+
+  const handleRegisterBabySubmit = async (babyData: Omit<z.infer<typeof babyHealthFormSchemaType>, 'id' | 'motherId'>) => {
+    const recordBaseData = { ...babyData, motherId: patientId }; // motherId is the current patientId
+    let fullRecordData: Omit<BabyRecord, 'id'> = { ...recordBaseData };
+
+    if (user && user.role === 'doctor') {
+        fullRecordData = {
+            ...fullRecordData,
+            doctorId: user.id,
+            doctorName: user.name,
+        };
+    }
+    
+    try {
+      await addBabyRecord(fullRecordData);
+      toast({ title: "Baby Registered Successfully", description: `New record for ${babyData.name || 'baby'} added.` });
+      setIsRegisterBabyFormOpen(false);
+    } catch (error) {
+      console.error("Error registering baby:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to register baby." });
+    }
+  };
   
-  const columns: ColumnDef<MaternityRecord>[] = useMemo(() => [
+  const maternityColumns: ColumnDef<MaternityRecord>[] = useMemo(() => [
     {
       accessorKey: 'pregnancyNumber',
       header: ({ column }) => (
@@ -193,11 +223,11 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => openEditForm(record)}>
+              <DropdownMenuItem onClick={() => openEditMaternityForm(record)}>
                 <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setRecordToDelete(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+              <DropdownMenuItem onClick={() => setMaternityRecordToDelete(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -205,17 +235,24 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
         );
       },
     },
-  ], [user?.role, user?.id, openEditForm, setRecordToDelete]);
+  ], [user?.role, user?.id, openEditMaternityForm, setMaternityRecordToDelete]);
 
   return (
     <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Maternity History</h2>
-         {(user?.role === 'admin' || user?.role === 'doctor') && (
-            <Button onClick={() => { setEditingRecord(undefined); setIsFormOpen(true); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Maternity Record
-            </Button>
-         )}
+         <div className="flex space-x-2">
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+                <Button onClick={() => { setEditingMaternityRecord(undefined); setIsMaternityFormOpen(true); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Maternity Record
+                </Button>
+            )}
+            {(user?.role === 'admin' || user?.role === 'doctor') && (
+                <Button variant="secondary" onClick={() => setIsRegisterBabyFormOpen(true)}>
+                    <HeartPulse className="mr-2 h-4 w-4" /> Register Baby
+                </Button>
+            )}
+         </div>
       </div>
 
       {maternityRecordsLoading && maternityRecords.length === 0 ? (
@@ -229,53 +266,72 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <AlertTitle>No Maternity History</AlertTitle>
             <AlertDescription>
                 There are no maternity history records available for {patientName} yet.
-                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
+                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one or register a baby."}
             </AlertDescription>
         </Alert>
       ) : (
         <DataTable
-            columns={columns}
+            columns={maternityColumns}
             data={maternityRecords}
             filterColumnId="outcome" 
             filterPlaceholder="Filter by outcome, doctor..."
         />
       )}
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isMaternityFormOpen} onOpenChange={setIsMaternityFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingRecord ? 'Edit Maternity Record' : 'Add New Maternity Record'}</DialogTitle>
+            <DialogTitle>{editingMaternityRecord ? 'Edit Maternity Record' : 'Add New Maternity Record'}</DialogTitle>
             <DialogDescription>
               Manage maternity history for {patientName}.
-              {user?.role === 'doctor' && !editingRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
-              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId === user.id && ` You are editing your entry.`}
-              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingRecord.doctorName || 'another doctor/admin'}.`}
+              {user?.role === 'doctor' && !editingMaternityRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
+              {user?.role === 'doctor' && editingMaternityRecord && editingMaternityRecord.doctorId === user.id && ` You are editing your entry.`}
+              {user?.role === 'doctor' && editingMaternityRecord && editingMaternityRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingMaternityRecord.doctorName || 'another doctor/admin'}.`}
             </DialogDescription>
           </DialogHeader>
           <MaternityHistoryForm
-            record={editingRecord}
-            onSubmit={handleFormSubmit}
-            onCancel={() => setIsFormOpen(false)}
+            record={editingMaternityRecord}
+            onSubmit={handleMaternityFormSubmit}
+            onCancel={() => setIsMaternityFormOpen(false)}
           />
         </DialogContent>
       </Dialog>
 
-      {recordToDelete && (
-        <AlertDialog open={!!recordToDelete} onOpenChange={() => setRecordToDelete(null)}>
+      {maternityRecordToDelete && (
+        <AlertDialog open={!!maternityRecordToDelete} onOpenChange={() => setMaternityRecordToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the maternity record for Pregnancy #{recordToDelete.pregnancyNumber}.
+                This action cannot be undone. This will permanently delete the maternity record for Pregnancy #{maternityRecordToDelete.pregnancyNumber}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogCancel onClick={() => setMaternityRecordToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteMaternityConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Dialog for Registering a Baby */}
+      <Dialog open={isRegisterBabyFormOpen} onOpenChange={setIsRegisterBabyFormOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Register New Baby for {patientName}</DialogTitle>
+            <DialogDescription>
+              Fill in the details for the new baby.
+              {user?.role === 'doctor' && ` This record will be attributed to you, Dr. ${user.name}.`}
+            </DialogDescription>
+          </DialogHeader>
+          <BabyHealthForm
+            // record prop is undefined for new baby
+            onSubmit={handleRegisterBabySubmit}
+            onCancel={() => setIsRegisterBabyFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
