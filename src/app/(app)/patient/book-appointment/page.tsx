@@ -15,7 +15,9 @@ import { AppointmentBookingForm, type AppointmentBookingFormDataType } from '@/c
 import type { Patient, DoctorSchedule, Appointment, DayOfWeek } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { addDays, format, parseISO, startOfDay, eachMinuteOfInterval, isFuture, isBefore, getDay, setHours, setMinutes, setSeconds, setMilliseconds, addMinutes as addMinutesFn, isEqual, endOfDay as dateFnsEndOfDay, isAfter } from 'date-fns';
-import { toZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz/toZonedTime.js';
+import { zonedTimeToUtc } from 'date-fns-tz/zonedTimeToUtc.js';
+import { formatInTimeZone } from 'date-fns-tz/formatInTimeZone.js';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -364,6 +366,12 @@ export default function PatientBookAppointmentPage() {
     </div>
   );
 }
+    
+
+    
+
+    
+
     
 
     

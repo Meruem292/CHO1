@@ -7,7 +7,10 @@ import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useAuth } from './use-auth-hook';
 import { format, parseISO, startOfDay, endOfDay, fromUnixTime, getUnixTime, addMinutes as addMinutesFn, isBefore, isAfter, isEqual, setHours, setMinutes, setSeconds, setMilliseconds, addHours, getDay, compareAsc } from 'date-fns';
-import { toZonedTime, zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz/toZonedTime.js';
+import { zonedTimeToUtc } from 'date-fns-tz/zonedTimeToUtc.js';
+import { formatInTimeZone } from 'date-fns-tz/formatInTimeZone.js';
+
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -322,5 +325,11 @@ export function useMockDb() {
     addAppointment,
   };
 }
+
+    
+
+    
+
+    
 
     
