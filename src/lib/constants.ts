@@ -1,6 +1,6 @@
 
 import type { NavItem, UserRole } from '@/types';
-import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History } from 'lucide-react';
 
 export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];
 
@@ -64,6 +64,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/doctor/my-appointments', // Doctor views their own appointments (redirects to /users/[doctorId]/appointments)
     label: 'My Appointments',
     icon: CalendarClock,
+    roles: ['doctor'],
+  },
+  {
+    href: '/doctor/activity-log',
+    label: 'My Activity Log',
+    icon: History,
     roles: ['doctor'],
   },
    {

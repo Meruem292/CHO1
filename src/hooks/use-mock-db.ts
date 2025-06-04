@@ -66,6 +66,12 @@ export function useMockDb() {
   const [doctorAppointmentsForBooking, setDoctorAppointmentsForBooking] = useState<Appointment[]>([]);
   const [doctorAppointmentsLoading, setDoctorAppointmentsLoading] = useState(true);
 
+  // State for doctor's activity log
+  const [doctorActivityConsultations, setDoctorActivityConsultations] = useState<ConsultationRecord[]>([]);
+  const [doctorActivityMaternity, setDoctorActivityMaternity] = useState<MaternityRecord[]>([]);
+  const [doctorActivityBaby, setDoctorActivityBaby] = useState<BabyRecord[]>([]);
+  const [doctorActivityLoading, setDoctorActivityLoading] = useState(true);
+
 
   useEffect(() => {
     const patientsRef = ref(database, 'patients');
@@ -143,8 +149,10 @@ export function useMockDb() {
 
   const addConsultation = useCallback(async (consultationData: Omit<ConsultationRecord, 'id'>) => {
     const newRef = push(ref(database, 'consultations'));
-    const dataToSave: Omit<ConsultationRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+    const patientRec = patients.find(p => p.id === consultationData.patientId);
+    const dataToSave: Omit<ConsultationRecord, 'id'> & { doctorId?: string; doctorName?: string; patientName?: string; } = {
          ...consultationData,
+         patientName: patientRec?.name || 'Unknown Patient',
          createdAt: serverTimestamp()
     };
 
@@ -155,13 +163,17 @@ export function useMockDb() {
 
     await set(newRef, dataToSave);
     return { ...dataToSave, id: newRef.key! } as ConsultationRecord;
-  }, [user]);
+  }, [user, patients]);
 
   const updateConsultation = useCallback(async (id: string, updates: Partial<Omit<ConsultationRecord, 'id'>>) => {
-    const dataToUpdate: Partial<Omit<ConsultationRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+    const patientRec = updates.patientId ? patients.find(p => p.id === updates.patientId) : null;
+    const dataToUpdate: Partial<Omit<ConsultationRecord, 'id'>> & { doctorId?: string; doctorName?: string; patientName?: string; updatedAt: object } = {
         ...updates,
         updatedAt: serverTimestamp()
     };
+    if (patientRec) {
+        dataToUpdate.patientName = patientRec.name;
+    }
 
     if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
@@ -169,7 +181,7 @@ export function useMockDb() {
     }
 
     await firebaseUpdate(ref(database, `consultations/${id}`), dataToUpdate);
-  }, [user]);
+  }, [user, patients]);
 
   const deleteConsultation = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `consultations/${id}`));
@@ -191,8 +203,10 @@ export function useMockDb() {
 
   const addMaternityRecord = useCallback(async (recordData: Omit<MaternityRecord, 'id'>) => {
     const newRef = push(ref(database, 'maternityRecords'));
-    const dataToSave: Omit<MaternityRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+    const patientRec = patients.find(p => p.id === recordData.patientId);
+    const dataToSave: Omit<MaternityRecord, 'id'> & { doctorId?: string; doctorName?: string; patientName?: string; } = {
         ...recordData,
+        patientName: patientRec?.name || 'Unknown Patient',
         createdAt: serverTimestamp()
     };
     if (user && user.role === 'doctor') {
@@ -201,25 +215,28 @@ export function useMockDb() {
     }
     await set(newRef, dataToSave);
     return { ...dataToSave, id: newRef.key! } as MaternityRecord;
-  }, [user]);
+  }, [user, patients]);
 
   const updateMaternityRecord = useCallback(async (id: string, updates: Partial<Omit<MaternityRecord, 'id'>>) => {
-    const dataToUpdate: Partial<Omit<MaternityRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+    const patientRec = updates.patientId ? patients.find(p => p.id === updates.patientId) : null;
+    const dataToUpdate: Partial<Omit<MaternityRecord, 'id'>> & { doctorId?: string; doctorName?: string; patientName?: string; updatedAt: object } = {
         ...updates,
         updatedAt: serverTimestamp()
     };
+    if (patientRec) {
+      dataToUpdate.patientName = patientRec.name;
+    }
      if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
     await firebaseUpdate(ref(database, `maternityRecords/${id}`), dataToUpdate);
-  }, [user]);
+  }, [user, patients]);
 
   const deleteMaternityRecord = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `maternityRecords/${id}`));
   }, []);
 
-  // Fetches baby records and updates shared state (used by BabyHealthPage)
   const getBabyRecordsByMotherId = useCallback((motherId: string) => {
     setBabyRecordsLoading(true);
     const recordsQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(motherId));
@@ -229,13 +246,12 @@ export function useMockDb() {
         setBabyRecordsLoading(false);
     }, (error) => {
         console.error(`Error fetching baby records for mother ${motherId}:`, error);
-        setBabyRecords([]); // Clear on error to avoid stale data
+        setBabyRecords([]); 
         setBabyRecordsLoading(false);
     });
     return unsubscribe;
   }, []);
 
-  // Fetches baby records for a specific mother once, without updating shared state
   const fetchBabyRecordsForMotherOnce = useCallback(async (motherId: string): Promise<BabyRecord[]> => {
     try {
       const recordsQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(motherId));
@@ -251,8 +267,10 @@ export function useMockDb() {
 
   const addBabyRecord = useCallback(async (recordData: Omit<BabyRecord, 'id'>) => {
     const newRef = push(ref(database, 'babyRecords'));
-    const dataToSave: Omit<BabyRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+    const motherRec = patients.find(p => p.id === recordData.motherId);
+    const dataToSave: Omit<BabyRecord, 'id'> & { doctorId?: string; doctorName?: string; motherName?: string; } = {
         ...recordData,
+        motherName: motherRec?.name || 'Unknown Mother',
         createdAt: serverTimestamp()
     };
     if (user && user.role === 'doctor') {
@@ -261,19 +279,23 @@ export function useMockDb() {
     }
     await set(newRef, dataToSave);
     return { ...dataToSave, id: newRef.key! } as BabyRecord;
-  }, [user]);
+  }, [user, patients]);
 
   const updateBabyRecord = useCallback(async (id: string, updates: Partial<Omit<BabyRecord, 'id'>>) => {
-    const dataToUpdate: Partial<Omit<BabyRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+    const motherRec = updates.motherId ? patients.find(p => p.id === updates.motherId) : null;
+    const dataToUpdate: Partial<Omit<BabyRecord, 'id'>> & { doctorId?: string; doctorName?: string; motherName?: string; updatedAt: object } = {
         ...updates,
         updatedAt: serverTimestamp()
     };
+    if (motherRec) {
+      dataToUpdate.motherName = motherRec.name;
+    }
     if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
     await firebaseUpdate(ref(database, `babyRecords/${id}`), dataToUpdate);
-  }, [user]);
+  }, [user, patients]);
 
   const deleteBabyRecord = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `babyRecords/${id}`));
@@ -336,9 +358,9 @@ export function useMockDb() {
         if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
         if (a.status !== 'scheduled' && b.status === 'scheduled') return 1;
         if (a.status === 'scheduled' && b.status === 'scheduled') {
-          return compareAsc(aDate, bDate); // Future scheduled appointments first
+          return compareAsc(aDate, bDate); 
         }
-        return compareAsc(bDate, aDate); // Then past/cancelled appointments, most recent first
+        return compareAsc(bDate, aDate); 
       });
       setAppointments(records);
       setAppointmentsLoading(false);
@@ -365,7 +387,7 @@ export function useMockDb() {
         }
         return compareAsc(bDate, aDate);
       });
-      setAppointments(records); // Re-using the 'appointments' state for simplicity in this dynamic page context
+      setAppointments(records); 
       setAppointmentsLoading(false);
     }, (error) => {
       console.error(`Error fetching appointments for doctor ${doctorId}:`, error);
@@ -380,13 +402,12 @@ export function useMockDb() {
     const appointmentsRef = ref(database, 'appointments');
     const unsubscribe = onValue(appointmentsRef, (snapshot) => {
       let records = snapshotToArray<Appointment>(snapshot);
-      records.sort((a, b) => { // Sort by date, then by status preference
+      records.sort((a, b) => { 
         const aDate = parseISO(a.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
         const bDate = parseISO(b.appointmentDateTimeStart || '1970-01-01T00:00:00.000Z');
         const dateComparison = compareAsc(aDate, bDate);
-        if (dateComparison !== 0) return dateComparison; // Primary sort: date
+        if (dateComparison !== 0) return dateComparison; 
 
-        // Secondary sort: status (scheduled first)
         if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
         if (a.status !== 'scheduled' && b.status === 'scheduled') return 1;
         return 0;
@@ -419,8 +440,6 @@ export function useMockDb() {
 
   const addAppointment = useCallback(async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newAppointmentRef = push(ref(database, 'appointments'));
-
-    // Fetch patient and doctor details to store names. Use existing 'patients' state.
     const patientRec = patients.find(p => p.id === appointmentData.patientId);
     const doctorRec = patients.find(p => p.id === appointmentData.doctorId);
 
@@ -434,7 +453,7 @@ export function useMockDb() {
 
     await set(newAppointmentRef, dataToSave);
     return { ...dataToSave, id: newAppointmentRef.key! } as Appointment;
-  }, [patients]); // Added patients to dependency array
+  }, [patients]); 
 
   const updateAppointmentStatus = useCallback(async (appointmentId: string, status: AppointmentStatus, cancelledByRole?: UserRole, cancellationReason?: string) => {
     const appointmentRef = ref(database, `appointments/${appointmentId}`);
@@ -451,6 +470,62 @@ export function useMockDb() {
   }, [user?.id]);
 
 
+  // Doctor Activity Log Functions
+  const getConsultationsByDoctor = useCallback((doctorId: string) => {
+    setDoctorActivityLoading(true);
+    const consultsRef = ref(database, 'consultations');
+    const unsubscribe = onValue(consultsRef, (snapshot) => {
+      const allConsults = snapshotToArray<ConsultationRecord>(snapshot);
+      const doctorConsults = allConsults
+        .filter(c => c.doctorId === doctorId)
+        .map(c => ({ ...c, patientName: patients.find(p => p.id === c.patientId)?.name || c.patientName || 'Unknown Patient' }))
+        .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setDoctorActivityConsultations(doctorConsults);
+      setDoctorActivityLoading(false);
+    }, (error) => {
+      console.error(`Error fetching consultations for doctor ${doctorId} activity:`, error);
+      setDoctorActivityLoading(false);
+    });
+    return unsubscribe;
+  }, [patients]);
+
+  const getMaternityRecordsByDoctor = useCallback((doctorId: string) => {
+    setDoctorActivityLoading(true);
+    const maternityRef = ref(database, 'maternityRecords');
+    const unsubscribe = onValue(maternityRef, (snapshot) => {
+      const allMaternity = snapshotToArray<MaternityRecord>(snapshot);
+      const doctorMaternity = allMaternity
+        .filter(m => m.doctorId === doctorId)
+        .map(m => ({ ...m, patientName: patients.find(p => p.id === m.patientId)?.name || m.patientName || 'Unknown Patient' }))
+        .sort((a,b) => (b.pregnancyNumber || 0) - (a.pregnancyNumber || 0));
+      setDoctorActivityMaternity(doctorMaternity);
+      setDoctorActivityLoading(false);
+    }, (error) => {
+      console.error(`Error fetching maternity records for doctor ${doctorId} activity:`, error);
+      setDoctorActivityLoading(false);
+    });
+    return unsubscribe;
+  }, [patients]);
+
+  const getBabyRecordsByDoctor = useCallback((doctorId: string) => {
+    setDoctorActivityLoading(true);
+    const babyRef = ref(database, 'babyRecords');
+    const unsubscribe = onValue(babyRef, (snapshot) => {
+      const allBaby = snapshotToArray<BabyRecord>(snapshot);
+      const doctorBaby = allBaby
+        .filter(b => b.doctorId === doctorId)
+        .map(b => ({ ...b, motherName: patients.find(p => p.id === b.motherId)?.name || b.motherName || 'Unknown Mother' }))
+        .sort((a,b) => new Date(b.birthDate).getTime() - new Date(a.birthDate).getTime());
+      setDoctorActivityBaby(doctorBaby);
+      setDoctorActivityLoading(false);
+    }, (error) => {
+      console.error(`Error fetching baby records for doctor ${doctorId} activity:`, error);
+      setDoctorActivityLoading(false);
+    });
+    return unsubscribe;
+  }, [patients]);
+
+
   return {
     patients, patientsLoading, getPatients, getPatientById, addPatient, updatePatient, deletePatient,
     consultations, consultationsLoading, getConsultationsByPatientId, addConsultation, updateConsultation, deleteConsultation,
@@ -462,6 +537,9 @@ export function useMockDb() {
     allAppointmentsForAdmin, allAppointmentsLoading, getAllAppointments,
     doctorAppointmentsForBooking, doctorAppointmentsLoading, getAppointmentsByDoctorIdForBooking,
     addAppointment,
+    // Doctor Activity Log
+    doctorActivityConsultations, doctorActivityMaternity, doctorActivityBaby, doctorActivityLoading,
+    getConsultationsByDoctor, getMaternityRecordsByDoctor, getBabyRecordsByDoctor,
   };
 }
 

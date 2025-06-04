@@ -46,6 +46,7 @@ export interface Patient extends PatientFormData {
 export interface ConsultationRecord {
   id: string;
   patientId: string; // This will always be the mother's ID
+  patientName?: string; // Denormalized for easier display in lists
   date: string;
   notes: string;
   diagnosis?: string;
@@ -62,6 +63,7 @@ export interface ConsultationRecord {
 export interface MaternityRecord {
   id: string;
   patientId: string;
+  patientName?: string; // Denormalized for easier display in lists
   pregnancyNumber: number;
   deliveryDate?: string;
   outcome?: string;
@@ -75,6 +77,7 @@ export interface MaternityRecord {
 export interface BabyRecord {
   id: string;
   motherId: string;
+  motherName?: string; // Denormalized for easier display in lists
   name?: string; // Baby's name
   birthDate: string;
   birthWeight?: string;
@@ -168,4 +171,3 @@ export interface AdminBootstrapConfig {
 export interface AppointmentBookingFormData {
   reasonForVisit?: string;
 }
-
