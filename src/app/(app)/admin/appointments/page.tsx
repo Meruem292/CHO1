@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Appointment, Patient, UserRole } from '@/types';
+import type { Appointment, Patient, UserRole, AppointmentStatus } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
@@ -26,10 +26,12 @@ import Link from 'next/link';
 import { format, parseISO, isFuture } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import * as dateFnsTz from 'date-fns-tz';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_Combined(dateString: string): string {
+  if (!dateString) return "Invalid Date";
   try {
     const d = parseISO(dateString);
     const datePart = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
@@ -82,28 +84,34 @@ export default function AdminManageAppointmentsPage() {
           Date & Time <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => formatInPHTime_Combined(row.original.appointmentDateTimeStart),
-      accessorFn: (row) => row.original.appointmentDateTimeStart,
+      cell: ({ row }) => {
+        const dateTime = row.original?.appointmentDateTimeStart;
+        return dateTime ? formatInPHTime_Combined(dateTime) : 'Invalid Date';
+      },
+      accessorFn: (row) => row.original?.appointmentDateTimeStart || '',
       sortingFn: 'datetime',
     },
     {
       accessorKey: 'patientName',
       header: 'Patient',
+      cell: ({ row }: { row: { original?: Appointment } }) => row.original?.patientName || 'N/A',
     },
     {
       accessorKey: 'doctorName',
       header: 'Doctor',
+      cell: ({ row }: { row: { original?: Appointment } }) => row.original?.doctorName || 'N/A',
     },
     {
       accessorKey: 'reasonForVisit',
       header: 'Reason',
-      cell: ({ row }) => <p className="truncate max-w-xs">{row.original.reasonForVisit || 'N/A'}</p>,
+      cell: ({ row }) => <p className="truncate max-w-xs">{row.original?.reasonForVisit || 'N/A'}</p>,
     },
     {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => {
-        const status = row.original.status;
+        const status = row.original?.status;
+        if (!status) return 'N/A';
         let icon = <CalendarClock className="mr-2 h-4 w-4 text-blue-500" />;
         if (status === 'completed') icon = <CheckCircle className="mr-2 h-4 w-4 text-green-500" />;
         else if (status.startsWith('cancelled')) icon = <CircleSlash className="mr-2 h-4 w-4 text-red-500" />;
@@ -122,6 +130,9 @@ export default function AdminManageAppointmentsPage() {
       id: 'actions',
       cell: ({ row }) => {
         const appointment = row.original;
+        if (!appointment || !appointment.appointmentDateTimeStart) {
+            return null;
+        }
         if (currentUser?.role !== 'admin' || appointment.status !== 'scheduled' || !isFuture(parseISO(appointment.appointmentDateTimeStart))) {
           return null;
         }
