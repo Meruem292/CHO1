@@ -8,7 +8,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, B
 import { DatePickerWithRange } from '@/components/ui/date-range-picker'; // Assume this exists or we'll create it
 import type { DateRange } from 'react-day-picker';
 import { addDays, format, isAfter, isBefore, isFuture, parseISO, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
-import { Users, Stethoscope, CalendarClock, CheckCircle, XCircle, TrendingUp, BarChart3, PieChart as PieIcon, Filter, Loader2 } from 'lucide-react';
+import { Users, Stethoscope, CalendarClock, CheckCircle, XCircle, TrendingUp, BarChart3, PieChart as PieIcon, Filter, Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 interface AdminDashboardProps {
