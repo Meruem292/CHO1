@@ -21,7 +21,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+
+const PH_TIMEZONE = 'Asia/Manila';
+
+function formatInPHTime_PPP(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+}
 
 interface BabyHealthFormProps {
   record?: BabyRecord;
@@ -79,7 +85,7 @@ export function BabyHealthForm({ record, onSubmit, onCancel }: BabyHealthFormPro
                       )}
                     >
                       {field.value ? (
-                        formatInTimeZone(parseISO(field.value), 'Asia/Manila', 'PPP')
+                        formatInPHTime_PPP(field.value)
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -140,7 +146,6 @@ export function BabyHealthForm({ record, onSubmit, onCancel }: BabyHealthFormPro
             </FormItem>
           )}
         />
-        {/* TODO: Add fields for vaccinations and checkups if needed in this basic form, or manage them separately */}
         <div className="flex justify-end space-x-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>

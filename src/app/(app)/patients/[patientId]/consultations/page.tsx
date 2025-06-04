@@ -40,8 +40,14 @@ import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
-import { formatInTimeZone } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
+
+const PH_TIMEZONE = 'Asia/Manila';
+
+function formatInPHTime_PPP(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+}
 
 interface ResolvedPageParams {
   patientId: string;
@@ -117,10 +123,10 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     try {
       if (editingConsultation) {
         await updateConsultation(editingConsultation.id, consultationData);
-        toast({ title: "Consultation Updated", description: `Record for ${formatInTimeZone(parseISO(data.date), 'Asia/Manila', 'PPP')} updated.` });
+        toast({ title: "Consultation Updated", description: `Record for ${formatInPHTime_PPP(data.date)} updated.` });
       } else {
         await addConsultation(consultationData);
-        toast({ title: "Consultation Added", description: `New record for ${formatInTimeZone(parseISO(data.date), 'Asia/Manila', 'PPP')} added.` });
+        toast({ title: "Consultation Added", description: `New record for ${formatInPHTime_PPP(data.date)} added.` });
       }
       setIsFormOpen(false);
       setEditingConsultation(undefined);
@@ -139,7 +145,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     if (consultationToDelete) {
       try {
         await deleteConsultation(consultationToDelete.id);
-        toast({ title: "Consultation Deleted", description: `Record from ${formatInTimeZone(parseISO(consultationToDelete.date), 'Asia/Manila', 'PPP')} deleted.` });
+        toast({ title: "Consultation Deleted", description: `Record from ${consultationToDelete.date ? formatInPHTime_PPP(consultationToDelete.date) : 'this record'} deleted.` });
         setConsultationToDelete(null);
       } catch (error) {
         console.error("Error deleting consultation:", error);
@@ -162,7 +168,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       ),
       cell: ({ row }) => {
         const dateVal = row.getValue("date") as string;
-        return dateVal ? formatInTimeZone(parseISO(dateVal), 'Asia/Manila', 'PPP') : 'N/A';
+        return dateVal ? formatInPHTime_PPP(dateVal) : 'N/A';
       }
     },
     {
@@ -297,7 +303,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the consultation record from {consultationToDelete.date ? formatInTimeZone(parseISO(consultationToDelete.date), 'Asia/Manila', 'PPP') : 'this record'}.
+                This action cannot be undone. This will permanently delete the consultation record from {consultationToDelete.date ? formatInPHTime_PPP(consultationToDelete.date) : 'this record'}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -310,4 +316,3 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
-

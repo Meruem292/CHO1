@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect } from 'react'; // Import useEffect
+import React, { useEffect } from 'react'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
@@ -24,10 +24,16 @@ import { Calendar } from '../ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+
+const PH_TIMEZONE = 'Asia/Manila';
+
+function formatInPHTime_PPP(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+}
 
 interface PatientFormProps {
-  patient?: Patient; // This is the Patient type from DB
+  patient?: Patient; 
   onSubmit: (data: PatientFormData) => void;
   onCancel?: () => void;
 }
@@ -39,7 +45,6 @@ const formStructure = [
       { name: 'firstName', label: 'First Name', placeholder: 'Juan' },
       { name: 'middleName', label: 'Middle Name (Optional)', placeholder: 'Rizal' },
       { name: 'lastName', label: 'Last Name', placeholder: 'Dela Cruz' },
-      // dateOfBirth is handled separately due to custom component
       { name: 'sex', label: 'Sex', type: 'select', options: [{value: 'male', label: 'Male'}, {value: 'female', label: 'Female'}, {value: 'other', label: 'Other'}], placeholder: 'Select sex' },
       { name: 'civilStatus', label: 'Civil Status (Optional)', placeholder: 'e.g., Single, Married' },
       { name: 'religion', label: 'Religion (Optional)', placeholder: 'e.g., Catholic, Christian' },
@@ -117,22 +122,17 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
   });
 
   useEffect(() => {
-    // When the patient prop changes (e.g., when opening the dialog for a different patient),
-    // reset the form with the new patient's data.
     form.reset(getInitialFormValues(patient));
   }, [patient, form.reset]);
 
   const handleSubmit = (data: PatientFormData) => {
     onSubmit(data);
-    // Reset to empty form state for a potential "Add New" scenario if the form remains mounted.
-    // If dialog closes, this has minor effect as it will re-initialize on next mount anyway.
     form.reset(getInitialFormValues(undefined));
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        {/* Date of Birth Field - handled separately */}
         <FormField
           control={form.control}
           name="dateOfBirth"
@@ -150,7 +150,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
                       )}
                     >
                       {field.value ? (
-                        formatInTimeZone(parseISO(field.value), 'Asia/Manila', 'PPP')
+                        formatInPHTime_PPP(field.value)
                       ) : (
                         <span>Pick a date</span>
                       )}

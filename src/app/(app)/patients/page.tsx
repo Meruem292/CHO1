@@ -37,8 +37,15 @@ import {
 import { PatientForm } from '@/components/forms/patient-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { formatInTimeZone } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
+
+const PH_TIMEZONE = 'Asia/Manila';
+
+function formatInPHTime_PPP(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+}
+
 
 export default function PatientsPage() {
   const { user } = useAuth();
@@ -59,10 +66,6 @@ export default function PatientsPage() {
         await updatePatient(editingPatient.id, patientDataWithRole);
         toast({ title: "Patient Updated", description: `${data.name} has been updated.` });
       } else {
-        // For adding new patients, the name is constructed from firstName, middleName, lastName
-        // The `addPatient` function in `useMockDb` might need adjustment or this data needs to be pre-processed
-        // to ensure `name` field is correctly populated if `useMockDb` doesn't do it.
-        // Assuming `addPatient` expects a full Patient-like object sans id.
         const constructedName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
         await addPatient({ ...patientDataWithRole, name: constructedName });
         toast({ title: "Patient Added", description: `${constructedName} has been added.` });
@@ -111,7 +114,7 @@ export default function PatientsPage() {
       header: 'Date of Birth',
        cell: ({ row }) => {
         const dob = row.getValue("dateOfBirth") as string;
-        return dob ? formatInTimeZone(parseISO(dob), 'Asia/Manila', 'PPP') : 'N/A';
+        return dob ? formatInPHTime_PPP(dob) : 'N/A';
        }
     },
     {
@@ -182,7 +185,7 @@ export default function PatientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">Manage Patients</h1>
-        {(user?.role === 'admin') && ( // Only admin can add patients
+        {(user?.role === 'admin') && ( 
           <Button onClick={() => { setEditingPatient(undefined); setIsFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Patient
           </Button>
@@ -191,7 +194,7 @@ export default function PatientsPage() {
 
       <DataTable
         columns={columns}
-        data={displayedPatients} // Use the filtered list
+        data={displayedPatients} 
         filterColumnId="name"
         filterPlaceholder="Filter by name..."
       />

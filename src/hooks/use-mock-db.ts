@@ -6,13 +6,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useAuth } from './use-auth-hook';
-import { format, parseISO, startOfDay, endOfDay, fromUnixTime, getUnixTime, addMinutes as addMinutesFn, isBefore, isAfter, isEqual, setHours, setMinutes, setSeconds, setMilliseconds, addHours, getDay, compareAsc } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz/toZonedTime.js';
-import { zonedTimeToUtc } from 'date-fns-tz/zonedTimeToUtc.js';
-import { formatInTimeZone } from 'date-fns-tz/formatInTimeZone.js';
+import { 
+  format, 
+  parseISO, 
+  startOfDay, 
+  endOfDay, 
+  addMinutes as addMinutesFn, 
+  isBefore, 
+  isAfter, 
+  isEqual, 
+  setHours, 
+  setMinutes, 
+  setSeconds, 
+  setMilliseconds, 
+  addHours, 
+  getDay, 
+  compareAsc 
+} from 'date-fns';
 
-
-const PH_TIMEZONE = 'Asia/Manila';
+const PH_TIMEZONE = 'Asia/Manila'; // Define if not already defined globally or locally as needed
 
 // Helper to transform Firebase snapshot to array
 const snapshotToArray = <T extends { id: string }>(snapshot: any): T[] => {
@@ -43,14 +55,13 @@ export function useMockDb() {
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
   const [doctorScheduleLoading, setDoctorScheduleLoading] = useState(true);
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]); // For patient's "My Appointments"
-  const [appointmentsLoading, setAppointmentsLoading] = useState(true); // For patient's "My Appointments"
+  const [appointments, setAppointments] = useState<Appointment[]>([]); 
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true); 
 
   const [doctorAppointmentsForBooking, setDoctorAppointmentsForBooking] = useState<Appointment[]>([]);
   const [doctorAppointmentsLoading, setDoctorAppointmentsLoading] = useState(true);
 
 
-  // Fetch all patients/users
   useEffect(() => {
     const patientsRef = ref(database, 'patients');
     const unsubscribe = onValue(patientsRef, (snapshot) => {
@@ -63,14 +74,12 @@ export function useMockDb() {
     return () => unsubscribe();
   }, []);
 
-  // Patient operations
   const getPatients = useCallback(() => patients, [patients]);
   const getPatientById = useCallback((id: string): Patient | undefined => patients.find(p => p.id === id), [patients]);
 
 
   const addPatient = useCallback(async (patientData: Omit<Patient, 'id' | 'role'>) => {
     const newPatientRef = push(ref(database, 'patients'));
-    // Ensure role is 'patient' if not specified by an admin creation flow
     const dataToSave: Omit<Patient, 'id'> = { ...patientData, role: 'patient', createdAt: serverTimestamp() };
     await set(newPatientRef, dataToSave);
     return { ...dataToSave, id: newPatientRef.key! } as Patient;
@@ -101,25 +110,18 @@ export function useMockDb() {
             firebaseRemove(childSnapshot.ref);
         });
     }, { onlyOnce: true });
-    // Also delete appointments associated with this patient
     const appointmentsAsPatientQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(id));
     onValue(appointmentsAsPatientQuery, (snapshot) => {
       snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
     }, { onlyOnce: true });
-    // If the deleted user was a doctor, also delete their appointments as a doctor
      const appointmentsAsDoctorQuery = query(ref(database, 'appointments'), orderByChild('doctorId'), equalTo(id));
     onValue(appointmentsAsDoctorQuery, (snapshot) => {
       snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
     }, { onlyOnce: true });
-    // Delete doctor schedule if they were a doctor
     const doctorScheduleRef = ref(database, `doctorSchedules/${id}`);
     firebaseRemove(doctorScheduleRef);
-
-
   }, []);
 
-
-  // Consultation operations
   const getConsultationsByPatientId = useCallback((patientId: string) => {
     setConsultationsLoading(true);
     const consultsQuery = query(ref(database, 'consultations'), orderByChild('patientId'), equalTo(patientId));
@@ -148,8 +150,6 @@ export function useMockDb() {
     await firebaseRemove(ref(database, `consultations/${id}`));
   }, []);
 
-
-  // Maternity Record operations
   const getMaternityHistoryByPatientId = useCallback((patientId: string) => {
     setMaternityRecordsLoading(true);
     const recordsQuery = query(ref(database, 'maternityRecords'), orderByChild('patientId'), equalTo(patientId));
@@ -178,8 +178,6 @@ export function useMockDb() {
     await firebaseRemove(ref(database, `maternityRecords/${id}`));
   }, []);
 
-
-  // Baby Health Record operations
   const getBabyRecordsByMotherId = useCallback((motherId: string) => {
     setBabyRecordsLoading(true);
     const recordsQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(motherId));
@@ -208,7 +206,6 @@ export function useMockDb() {
     await firebaseRemove(ref(database, `babyRecords/${id}`));
   }, []);
 
-  // Doctor Schedule Operations
   const getDoctorScheduleById = useCallback((doctorId: string) => {
     setDoctorScheduleLoading(true);
     const scheduleRef = ref(database, `doctorSchedules/${doctorId}`);
@@ -241,7 +238,6 @@ export function useMockDb() {
     return { ...scheduleData, id: scheduleData.doctorId } as DoctorSchedule;
   }, []);
 
-  // Appointment Operations
   const getAppointmentsByPatientId = useCallback((patientId: string) => {
     setAppointmentsLoading(true);
     const appointmentsQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(patientId));
@@ -325,11 +321,3 @@ export function useMockDb() {
     addAppointment,
   };
 }
-
-    
-
-    
-
-    
-
-    

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, use } from 'react'; // Import `use`
+import React, { useState, useMemo, useEffect, use } from 'react';
 import type { BabyRecord, Patient } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
@@ -37,20 +37,27 @@ import {
 import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { formatInTimeZone } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
 
+const PH_TIMEZONE = 'Asia/Manila';
+
+function formatInPHTime_PPP(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+}
+
+
 interface ResolvedPageParams {
-  patientId: string; // This is the mother's ID
+  patientId: string; 
 }
 
 interface BabyHealthPageProps {
-  params: Promise<ResolvedPageParams>; // params is a Promise
+  params: Promise<ResolvedPageParams>; 
 }
 
 export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHealthPageProps) {
-  const actualParams = use(paramsPromise); // Unwrap the Promise
-  const { patientId: motherId } = actualParams; // Destructure from resolved params, rename to motherId for clarity
+  const actualParams = use(paramsPromise); 
+  const { patientId: motherId } = actualParams; 
 
   const { user } = useAuth();
   const { 
@@ -148,7 +155,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
       ),
       cell: ({ row }) => {
         const dateVal = row.getValue("birthDate") as string;
-        return dateVal ? formatInTimeZone(parseISO(dateVal), 'Asia/Manila', 'PPP') : 'N/A';
+        return dateVal ? formatInPHTime_PPP(dateVal) : 'N/A';
       }
     },
     {
