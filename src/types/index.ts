@@ -63,6 +63,8 @@ export interface MaternityRecord {
   deliveryDate?: string;
   outcome?: string;
   complications?: string;
+  doctorId?: string;
+  doctorName?: string;
   createdAt?: object;
   updatedAt?: object;
 }
@@ -77,6 +79,8 @@ export interface BabyRecord {
   apgarScore?: string;
   vaccinations?: Array<{ date: string; vaccine: string; notes?: string }>;
   checkups?: Array<{ date: string; notes: string; weight?: string; height?: string }>;
+  doctorId?: string;
+  doctorName?: string;
   createdAt?: object;
   updatedAt?: object;
 }

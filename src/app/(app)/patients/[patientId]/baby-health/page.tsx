@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, HeartPulse, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, HeartPulse, AlertTriangle, UserMdIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BabyHealthForm } from '@/components/forms/baby-health-form';
 import { toast } from '@/hooks/use-toast';
-// import Link from 'next/link'; // Link is handled by the layout
 import { parseISO } from 'date-fns';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -64,7 +63,7 @@ interface BabyHealthPageProps {
 
 export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHealthPageProps) {
   const actualParams = use(paramsPromise); 
-  const { patientId: motherId } = actualParams; // Access control handled by layout
+  const { patientId: motherId } = actualParams; 
 
   const { user } = useAuth();
   const { 
@@ -94,14 +93,24 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
   }, [motherId, getBabyRecordsByMotherId]);
 
 
-  const handleFormSubmit = async (data: Omit<BabyRecord, 'id' | 'motherId'>) => {
-    const recordData = { ...data, motherId };
+  const handleFormSubmit = async (data: Omit<BabyRecord, 'id' | 'motherId' | 'doctorId' | 'doctorName'>) => {
+    const recordBaseData = { ...data, motherId };
+    let fullRecordData: Omit<BabyRecord, 'id'> = { ...recordBaseData };
+
+    if (user && user.role === 'doctor') {
+        fullRecordData = {
+            ...fullRecordData,
+            doctorId: user.id,
+            doctorName: user.name,
+        };
+    }
+    
     try {
       if (editingRecord) {
-        await updateBabyRecord(editingRecord.id, recordData);
+        await updateBabyRecord(editingRecord.id, fullRecordData);
         toast({ title: "Baby Record Updated", description: `Record for ${data.name || 'baby'} updated.` });
       } else {
-        await addBabyRecord(recordData);
+        await addBabyRecord(fullRecordData);
         toast({ title: "Baby Record Added", description: `New record for ${data.name || 'baby'} added.` });
       }
       setIsFormOpen(false);
@@ -168,10 +177,18 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
       cell: ({ row }) => row.getValue("apgarScore")?.toString() || 'N/A',
     },
     {
+      accessorKey: 'doctorName',
+      header: 'Recorded By',
+      cell: ({ row }) => row.original.doctorName || 'N/A',
+    },
+    {
       id: 'actions',
       cell: ({ row }) => {
         const record = row.original;
-         if (user?.role === 'patient') return null;
+        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === record.doctorId);
+        if (!canEdit && user?.role !== 'patient') return null;
+        if (user?.role === 'patient') return null;
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -194,7 +211,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         );
       },
     },
-  ], [user?.role]); 
+  ], [user?.role, user?.id]); 
 
   return (
     <div className="space-y-6 mt-6">
@@ -226,7 +243,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             columns={columns}
             data={babyRecords}
             filterColumnId="name"
-            filterPlaceholder="Filter by baby's name..."
+            filterPlaceholder="Filter by baby's name, doctor..."
         />
       )}
 
@@ -236,6 +253,9 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             <DialogTitle>{editingRecord ? 'Edit Baby Record' : 'Add New Baby Record'}</DialogTitle>
             <DialogDescription>
               Manage baby health records for {motherName}'s child.
+              {user?.role === 'doctor' && !editingRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
+              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId === user.id && ` You are editing your entry.`}
+              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingRecord.doctorName || 'another doctor/admin'}.`}
             </DialogDescription>
           </DialogHeader>
           <BabyHealthForm
@@ -265,3 +285,4 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     </div>
   );
 }
+

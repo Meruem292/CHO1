@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle, UserMdIcon } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MaternityHistoryForm } from '@/components/forms/maternity-history-form';
 import { toast } from '@/hooks/use-toast';
-// import Link from 'next/link'; // Link is handled by the layout
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { parseISO } from 'date-fns';
@@ -64,7 +63,7 @@ interface MaternityHistoryPageProps {
 
 export default function PatientMaternityHistoryPage({ params: paramsPromise }: MaternityHistoryPageProps) {
   const actualParams = use(paramsPromise);
-  const { patientId } = actualParams; // Access control handled by layout
+  const { patientId } = actualParams; 
 
   const { user } = useAuth();
   const { 
@@ -94,14 +93,24 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
   }, [patientId, getMaternityHistoryByPatientId]);
 
 
-  const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId'>) => {
-    const recordData = { ...data, patientId };
+  const handleFormSubmit = async (data: Omit<MaternityRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+    const recordBaseData = { ...data, patientId };
+    let fullRecordData: Omit<MaternityRecord, 'id'> = { ...recordBaseData };
+
+    if (user && user.role === 'doctor') {
+      fullRecordData = {
+        ...fullRecordData,
+        doctorId: user.id,
+        doctorName: user.name,
+      };
+    }
+
     try {
       if (editingRecord) {
-        await updateMaternityRecord(editingRecord.id, recordData);
+        await updateMaternityRecord(editingRecord.id, fullRecordData);
         toast({ title: "Maternity Record Updated", description: `Pregnancy #${data.pregnancyNumber} record updated.` });
       } else {
-        await addMaternityRecord(recordData);
+        await addMaternityRecord(fullRecordData);
         toast({ title: "Maternity Record Added", description: `Pregnancy #${data.pregnancyNumber} record added.` });
       }
       setIsFormOpen(false);
@@ -162,10 +171,18 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("complications")?.toString() || 'None'}</p>,
     },
     {
+      accessorKey: 'doctorName',
+      header: 'Recorded By',
+      cell: ({ row }) => row.original.doctorName || 'N/A',
+    },
+    {
       id: 'actions',
       cell: ({ row }) => {
         const record = row.original;
+        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === record.doctorId);
+        if (!canEdit && user?.role !== 'patient') return null; 
         if (user?.role === 'patient') return null;
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -188,7 +205,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
         );
       },
     },
-  ], [user?.role, openEditForm, setRecordToDelete]);
+  ], [user?.role, user?.id, openEditForm, setRecordToDelete]);
 
   return (
     <div className="space-y-6 mt-6">
@@ -220,7 +237,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             columns={columns}
             data={maternityRecords}
             filterColumnId="outcome" 
-            filterPlaceholder="Filter by outcome..."
+            filterPlaceholder="Filter by outcome, doctor..."
         />
       )}
 
@@ -230,6 +247,9 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <DialogTitle>{editingRecord ? 'Edit Maternity Record' : 'Add New Maternity Record'}</DialogTitle>
             <DialogDescription>
               Manage maternity history for {patientName}.
+              {user?.role === 'doctor' && !editingRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
+              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId === user.id && ` You are editing your entry.`}
+              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingRecord.doctorName || 'another doctor/admin'}.`}
             </DialogDescription>
           </DialogHeader>
           <MaternityHistoryForm
@@ -259,3 +279,4 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     </div>
   );
 }
+

@@ -152,7 +152,6 @@ export function useMockDb() {
         dataToSave.doctorId = user.id;
         dataToSave.doctorName = user.name;
     }
-    // If user is admin, doctorId and doctorName remain undefined or as passed in consultationData (if explicitly set)
 
     await set(newRef, dataToSave);
     return { ...dataToSave, id: newRef.key! } as ConsultationRecord;
@@ -164,11 +163,10 @@ export function useMockDb() {
         updatedAt: serverTimestamp()
     };
 
-    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { // Only add if not already being explicitly updated
+    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
-    // If admin updates, it doesn't automatically overwrite doctorId/Name unless explicitly part of 'updates'
 
     await firebaseUpdate(ref(database, `consultations/${id}`), dataToUpdate);
   }, [user]);
@@ -193,13 +191,29 @@ export function useMockDb() {
 
   const addMaternityRecord = useCallback(async (recordData: Omit<MaternityRecord, 'id'>) => {
     const newRef = push(ref(database, 'maternityRecords'));
-    await set(newRef, { ...recordData, createdAt: serverTimestamp() });
-    return { ...recordData, id: newRef.key! } as MaternityRecord;
-  }, []);
+    const dataToSave: Omit<MaternityRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+        ...recordData,
+        createdAt: serverTimestamp()
+    };
+    if (user && user.role === 'doctor') {
+        dataToSave.doctorId = user.id;
+        dataToSave.doctorName = user.name;
+    }
+    await set(newRef, dataToSave);
+    return { ...dataToSave, id: newRef.key! } as MaternityRecord;
+  }, [user]);
 
   const updateMaternityRecord = useCallback(async (id: string, updates: Partial<Omit<MaternityRecord, 'id'>>) => {
-    await firebaseUpdate(ref(database, `maternityRecords/${id}`), { ...updates, updatedAt: serverTimestamp() });
-  }, []);
+    const dataToUpdate: Partial<Omit<MaternityRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+        ...updates,
+        updatedAt: serverTimestamp()
+    };
+     if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
+        dataToUpdate.doctorId = user.id;
+        dataToUpdate.doctorName = user.name;
+    }
+    await firebaseUpdate(ref(database, `maternityRecords/${id}`), dataToUpdate);
+  }, [user]);
 
   const deleteMaternityRecord = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `maternityRecords/${id}`));
@@ -221,13 +235,29 @@ export function useMockDb() {
 
   const addBabyRecord = useCallback(async (recordData: Omit<BabyRecord, 'id'>) => {
     const newRef = push(ref(database, 'babyRecords'));
-    await set(newRef, { ...recordData, createdAt: serverTimestamp() });
-    return { ...recordData, id: newRef.key! } as BabyRecord;
-  }, []);
+    const dataToSave: Omit<BabyRecord, 'id'> & { doctorId?: string; doctorName?: string } = {
+        ...recordData,
+        createdAt: serverTimestamp()
+    };
+    if (user && user.role === 'doctor') {
+        dataToSave.doctorId = user.id;
+        dataToSave.doctorName = user.name;
+    }
+    await set(newRef, dataToSave);
+    return { ...dataToSave, id: newRef.key! } as BabyRecord;
+  }, [user]);
 
   const updateBabyRecord = useCallback(async (id: string, updates: Partial<Omit<BabyRecord, 'id'>>) => {
-    await firebaseUpdate(ref(database, `babyRecords/${id}`), { ...updates, updatedAt: serverTimestamp() });
-  }, []);
+    const dataToUpdate: Partial<Omit<BabyRecord, 'id'>> & { doctorId?: string; doctorName?: string; updatedAt: object } = {
+        ...updates,
+        updatedAt: serverTimestamp()
+    };
+    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
+        dataToUpdate.doctorId = user.id;
+        dataToUpdate.doctorName = user.name;
+    }
+    await firebaseUpdate(ref(database, `babyRecords/${id}`), dataToUpdate);
+  }, [user]);
 
   const deleteBabyRecord = useCallback(async (id: string) => {
     await firebaseRemove(ref(database, `babyRecords/${id}`));
