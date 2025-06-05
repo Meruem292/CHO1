@@ -1,24 +1,17 @@
 
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-export default function AppRootPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Perform the redirect to the dashboard.
-    router.replace('/dashboard');
-  }, [router]);
-
-  // Return a loading indicator while the redirect is happening.
-  // This ensures the component always returns valid JSX.
+// This is a temporary diagnostic page.
+// Its purpose is to see if Vercel can build *any* client component
+// at the path /app/(app)/page.tsx without the redirect logic.
+export default function AppRootPlaceholderPage() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="ml-3 text-lg">Redirecting to dashboard...</p>
+      <p className="ml-3 text-lg">Diagnostic Placeholder Page</p>
+      <p className="mt-2 text-sm text-muted-foreground">If you see this after deployment, the build for this page structure was successful.</p>
     </div>
   );
 }
