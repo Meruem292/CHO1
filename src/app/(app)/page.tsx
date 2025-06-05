@@ -1,20 +1,12 @@
-'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
 export default function AppRootPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/dashboard');
-  }, [router]);
-
-  return (
-    <div className="flex h-screen w-full flex-col items-center justify-center space-y-4">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <p className="text-lg text-muted-foreground">Loading dashboard...</p>
-    </div>
-  );
+  redirect('/dashboard');
+  // This component will not render anything as redirect() throws an error.
+  // However, to satisfy React's requirement for a return,
+  // and in case redirect itself had a different behavior in a future Next.js version (unlikely for this use),
+  // we can return null or a basic loader.
+  // For a server component using redirect, often nothing after it is executed.
+  return null;
 }
