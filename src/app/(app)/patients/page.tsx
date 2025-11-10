@@ -75,38 +75,40 @@ export default function PatientsPage() {
   const [editingPatient, setEditingPatient] = useState<Patient | undefined>(undefined);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
 
-  const [doctorAppointments, setDoctorAppointments] = useState<Appointment[]>([]);
-  const [doctorAppointmentsLoading, setDoctorAppointmentsLoading] = useState(user?.role === 'doctor');
+  const [providerAppointments, setProviderAppointments] = useState<Appointment[]>([]);
+  const [providerAppointmentsLoading, setProviderAppointmentsLoading] = useState(user?.role === 'doctor' || user?.role === 'midwife/nurse');
+
+  const isProvider = user?.role === 'doctor' || user?.role === 'midwife/nurse';
 
   useEffect(() => {
     let unsubAppointments: (() => void) | undefined;
-    if (user?.role === 'doctor' && user.id) {
-      setDoctorAppointmentsLoading(true);
+    if (isProvider && user.id) {
+      setProviderAppointmentsLoading(true);
       const appointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(user.id));
       unsubAppointments = onValue(appointmentsQuery, (snapshot) => {
-        setDoctorAppointments(snapshotToArray<Appointment>(snapshot));
-        setDoctorAppointmentsLoading(false);
+        setProviderAppointments(snapshotToArray<Appointment>(snapshot));
+        setProviderAppointmentsLoading(false);
       }, (error) => {
-        console.error("Error fetching doctor's appointments:", error);
-        setDoctorAppointmentsLoading(false);
+        console.error("Error fetching provider's appointments:", error);
+        setProviderAppointmentsLoading(false);
       });
     }
     return () => {
       if (unsubAppointments) unsubAppointments();
     };
-  }, [user]);
+  }, [user, isProvider]);
 
   const displayedPatients = useMemo(() => {
     if (user?.role === 'admin') {
       return allPatientsFromHook.filter(p => p.role === 'patient');
     }
-    if (user?.role === 'doctor') {
-      if (doctorAppointmentsLoading) return [];
-      const patientIdsForDoctor = new Set(doctorAppointments.map(app => app.patientId));
-      return allPatientsFromHook.filter(p => p.role === 'patient' && patientIdsForDoctor.has(p.id));
+    if (isProvider) {
+      if (providerAppointmentsLoading) return [];
+      const patientIdsForProvider = new Set(providerAppointments.map(app => app.patientId));
+      return allPatientsFromHook.filter(p => p.role === 'patient' && patientIdsForProvider.has(p.id));
     }
     return []; 
-  }, [allPatientsFromHook, user, doctorAppointments, doctorAppointmentsLoading]);
+  }, [allPatientsFromHook, user, isProvider, providerAppointments, providerAppointmentsLoading]);
 
   const handleFormSubmit = async (data: Omit<Patient, 'id' | 'role'>) => {
     const patientDataWithRole: Omit<Patient, 'id'> = { ...data, role: 'patient' };
@@ -218,7 +220,7 @@ export default function PatientsPage() {
         <Alert variant="destructive">
             <Users className="h-4 w-4" />
             <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>This page is for administrative staff and doctors only.</AlertDescription>
+            <AlertDescription>This page is for administrative staff and providers only.</AlertDescription>
         </Alert>
          <Link href="/dashboard" className="text-primary hover:underline">
             Go to Dashboard
@@ -227,7 +229,7 @@ export default function PatientsPage() {
     );
   }
 
-  const overallLoading = patientsLoading || (user?.role === 'doctor' && doctorAppointmentsLoading);
+  const overallLoading = patientsLoading || (isProvider && providerAppointmentsLoading);
 
   if (overallLoading && displayedPatients.length === 0) {
     return (

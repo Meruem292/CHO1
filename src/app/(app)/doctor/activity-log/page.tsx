@@ -10,7 +10,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ConsultationRecord, MaternityRecord, BabyRecord } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ChevronLeft, ClipboardList, Baby, HeartPulse, Eye, History } from 'lucide-react';
+import { Loader2, ChevronLeft, ClipboardList, Baby, HeartPulse, Eye, History, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { parseISO, format } from 'date-fns';
@@ -40,13 +40,17 @@ export default function DoctorActivityLogPage() {
     patients // Used to look up patient names if not denormalized
   } = useMockDb();
 
+  const isProvider = user?.role === 'doctor' || user?.role === 'midwife/nurse';
+
   useEffect(() => {
     let unsubConsultations: (() => void) | undefined;
     let unsubMaternity: (() => void) | undefined;
     let unsubBaby: (() => void) | undefined;
 
-    if (user?.role === 'doctor' && user.id) {
-      unsubConsultations = getConsultationsByDoctor(user.id);
+    if (isProvider && user.id) {
+      if (user.role === 'doctor') {
+        unsubConsultations = getConsultationsByDoctor(user.id);
+      }
       unsubMaternity = getMaternityRecordsByDoctor(user.id);
       unsubBaby = getBabyRecordsByDoctor(user.id);
     }
@@ -56,7 +60,7 @@ export default function DoctorActivityLogPage() {
       if (unsubMaternity) unsubMaternity();
       if (unsubBaby) unsubBaby();
     };
-  }, [user, getConsultationsByDoctor, getMaternityRecordsByDoctor, getBabyRecordsByDoctor]);
+  }, [user, isProvider, getConsultationsByDoctor, getMaternityRecordsByDoctor, getBabyRecordsByDoctor]);
 
   const consultationColumns: ColumnDef<ConsultationRecord>[] = useMemo(() => [
     {
@@ -148,6 +152,18 @@ export default function DoctorActivityLogPage() {
       ),
     },
   ], [patients]);
+  
+  if (!isProvider && user) {
+     return (
+        <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>
+                You do not have permission to view this page. This page is for providers only.
+            </AlertDescription>
+        </Alert>
+     )
+  }
 
   if (doctorActivityLoading && !doctorActivityConsultations.length && !doctorActivityMaternity.length && !doctorActivityBaby.length) {
     return (
@@ -168,27 +184,29 @@ export default function DoctorActivityLogPage() {
         <History className="mr-3 h-8 w-8 text-primary" /> My Activity Log
       </h1>
       <p className="text-muted-foreground">
-        A history of consultations, maternity records, and baby health records you have created or managed.
+        A history of records you have created or managed.
       </p>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><ClipboardList className="mr-2 h-5 w-5 text-blue-500" />Consultations Logged</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {doctorActivityConsultations.length > 0 ? (
-            <DataTable columns={consultationColumns} data={doctorActivityConsultations} filterColumnId="patientName" filterPlaceholder="Filter by patient..."/>
-          ) : (
-            <Alert>
-              <ClipboardList className="h-4 w-4" />
-              <AlertTitle>No Consultations Logged</AlertTitle>
-              <AlertDescription>You have not logged any consultations yet.</AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+      {user?.role === 'doctor' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center"><ClipboardList className="mr-2 h-5 w-5 text-blue-500" />Consultations Logged</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {doctorActivityConsultations.length > 0 ? (
+              <DataTable columns={consultationColumns} data={doctorActivityConsultations} filterColumnId="patientName" filterPlaceholder="Filter by patient..."/>
+            ) : (
+              <Alert>
+                <ClipboardList className="h-4 w-4" />
+                <AlertTitle>No Consultations Logged</AlertTitle>
+                <AlertDescription>You have not logged any consultations yet.</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      <Separator />
+      {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && <Separator />}
 
       <Card>
         <CardHeader>
@@ -228,4 +246,3 @@ export default function DoctorActivityLogPage() {
     </div>
   );
 }
-

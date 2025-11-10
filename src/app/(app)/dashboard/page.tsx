@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth-hook";
 import { useMockDb } from "@/hooks/use-mock-db";
-import { Users, ClipboardList, Baby, HeartPulse, Loader2 } from "lucide-react";
+import { Users, ClipboardList, Baby, HeartPulse, Loader2, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import type { Patient } from '@/types';
 import { AdminDashboard } from '@/components/admin-dashboard'; // New component for admin
@@ -113,17 +113,18 @@ export default function DashboardPage() {
     );
   }
 
-  // Patient/Doctor Dashboard
+  // Patient/Doctor/Midwife Dashboard
+  const isProvider = user.role === 'doctor' || user.role === 'midwife/nurse';
   const totalPatientsInSystem = patients.filter((p: Patient) => p.role === 'patient').length; 
   
   const stats = user.role === 'patient' ? [
     { title: "My Consultations", value: myConsultationsCount, icon: ClipboardList, href: `/patients/${user.id}/consultations`, loading: consultationsLoading },
     { title: "My Maternity Records", value: myMaternityRecordsCount, icon: Baby, href: `/patients/${user.id}/maternity-history`, loading: maternityRecordsLoading },
     { title: "My Baby's Records", value: myBabyRecordsCount, icon: HeartPulse, href: `/patients/${user.id}/baby-health`, loading: patientBabyRecordsLoading },
-  ] : user.role === 'doctor' ? [
+  ] : isProvider ? [
     { title: "Total Patients in System", value: totalPatientsInSystem, icon: Users, href: "/patients", loading: patientsLoading },
-    // More doctor-specific stats could be added here if needed
-  ] : []; // Should not reach here for admin, but as a fallback
+    // More provider-specific stats could be added here if needed
+  ] : [];
 
   return (
     <div className="space-y-6">
@@ -159,9 +160,10 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row gap-4">
                 {user.role === 'patient' && <Link href="/patient/book-appointment" className="text-primary hover:underline">Book New Appointment</Link>}
-                {user.role === 'doctor' && <Link href="/patients" className="text-primary hover:underline">View My Associated Patients</Link>}
-                {user.role === 'doctor' && <Link href="/doctor/my-schedule" className="text-primary hover:underline">Manage My Schedule</Link>}
-                {(user.role === 'doctor' || user.role === 'patient') && <Link href={`/users/${user.id}/appointments`} className="text-primary hover:underline">View My Appointments</Link>}
+                {isProvider && <Link href="/patients" className="text-primary hover:underline">View My Associated Patients</Link>}
+                {isProvider && <Link href="/doctor/my-schedule" className="text-primary hover:underline">Manage My Schedule</Link>}
+                {isProvider && <Link href={`/users/${user.id}/appointments`} className="text-primary hover:underline">View My Appointments</Link>}
+                {user.role === 'patient' && <Link href={`/users/${user.id}/appointments`} className="text-primary hover:underline">View My Appointments</Link>}
             </CardContent>
         </Card>
       )}
