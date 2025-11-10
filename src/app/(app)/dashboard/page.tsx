@@ -33,8 +33,6 @@ export default function DashboardPage() {
     let unsubAppointments: (() => void) | undefined;
     if (user?.role === 'admin') {
       unsubAppointments = getAllAppointments();
-      // Patients are already fetched globally by useMockDb
-      // No need to fetch babyRecords globally here as we're omitting that stat for now.
     }
     return () => {
       if (unsubAppointments) unsubAppointments();
