@@ -78,11 +78,6 @@ export default function AuditLogPage() {
       header: 'Description',
       cell: ({ row }) => <p className="max-w-md truncate">{row.original.description}</p>,
     },
-     {
-      accessorKey: 'targetId',
-      header: 'Target ID',
-      cell: ({ row }) => <p className="font-mono text-xs">{row.original.targetId || 'N/A'}</p>,
-    },
   ], []);
 
   if (isLoading && user?.role === 'admin') {
