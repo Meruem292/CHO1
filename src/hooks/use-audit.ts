@@ -6,6 +6,27 @@ import { database } from '@/lib/firebase-config';
 import { ref, push, set, serverTimestamp, query, orderByChild, limitToLast, onValue } from 'firebase/database';
 import type { AuditLog, AuditLogAction, UserRole, User } from '@/types';
 
+// Helper to recursively remove undefined values from an object
+const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefinedValues).filter(v => v !== undefined);
+  }
+  if (typeof obj === 'object') {
+    return Object.entries(obj).reduce((acc, [key, value]) => {
+      const cleanedValue = removeUndefinedValues(value);
+      if (cleanedValue !== undefined) {
+        acc[key as keyof typeof acc] = cleanedValue;
+      }
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
+
+
 // Centralized function to create an audit log
 export const createAuditLog = async (
   currentUser: User,
@@ -32,18 +53,12 @@ export const createAuditLog = async (
     details,
   };
 
-  // Remove undefined properties before sending to Firebase
-  Object.keys(logEntry).forEach(key => {
-    const K = key as keyof typeof logEntry;
-    if (logEntry[K] === undefined) {
-      delete logEntry[K];
-    }
-  });
+  const cleanedLogEntry = removeUndefinedValues(logEntry);
 
 
   try {
     const logRef = push(ref(database, 'auditLogs'));
-    await set(logRef, logEntry);
+    await set(logRef, cleanedLogEntry);
   } catch (error) {
     console.error("Failed to create audit log:", error);
     // Depending on requirements, you might want to handle this more gracefully
