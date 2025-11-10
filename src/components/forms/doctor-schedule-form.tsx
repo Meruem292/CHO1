@@ -88,7 +88,10 @@ export function DoctorScheduleForm({ doctorId, currentSchedule, onSubmit, isLoad
                 <FormItem>
                   <FormLabel>Default Appointment Slot Duration (minutes)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 30" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                    <Input type="number" placeholder="e.g., 30" {...field} onChange={e => {
+                        const value = parseInt(e.target.value, 10);
+                        field.onChange(isNaN(value) ? undefined : value);
+                      }} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -101,7 +104,10 @@ export function DoctorScheduleForm({ doctorId, currentSchedule, onSubmit, isLoad
                 <FormItem>
                   <FormLabel>Booking Notice Period (hours, optional)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 24" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                    <Input type="number" placeholder="e.g., 24" {...field} onChange={e => {
+                        const value = parseInt(e.target.value, 10);
+                        field.onChange(isNaN(value) ? undefined : value);
+                      }} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
