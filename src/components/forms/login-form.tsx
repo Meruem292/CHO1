@@ -36,11 +36,7 @@ export function LoginForm() {
   });
 
   async function onSubmit(data: z.infer<typeof loginSchema>) {
-    // Assuming 'email' field is used for email
-    if (!data.email.includes('@')) {
-        toast({ variant: "destructive", title: "Invalid Input", description: "Please enter a valid email address for login." });
-        return;
-    }
+    // The validation is handled by the auth provider, no need for manual checks here.
     await loginWithEmail(data.email, data.password);
   }
 
