@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope, Archive } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope, Archive, MessageSquarePlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,10 +222,10 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
+        const isPatientEntry = consultation.doctorName === "Patient Entry";
         const canEditOwn = user?.role === 'doctor' && user.id === consultation.doctorId;
-        const canRespondToPatient = user?.role === 'doctor' && consultation.doctorName === 'Patient Entry';
-        const canEdit = canEditOwn || canRespondToPatient;
-        const canArchive = user?.role === 'admin' || canEdit;
+        const canRespondToPatient = user?.role === 'doctor' && isPatientEntry;
+        const canArchive = user?.role === 'admin' || canEditOwn || canRespondToPatient;
 
         if (!canArchive) return null;
 
@@ -239,12 +239,17 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {canEdit && (
+              {canRespondToPatient && (
+                <DropdownMenuItem onClick={() => openEditForm(consultation)}>
+                  <MessageSquarePlus className="mr-2 h-4 w-4" /> Respond
+                </DropdownMenuItem>
+              )}
+               {canEditOwn && (
                 <DropdownMenuItem onClick={() => openEditForm(consultation)}>
                   <Edit className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
               )}
-              {canArchive && canEdit && <DropdownMenuSeparator />}
+              {canArchive && (canEditOwn || canRespondToPatient) && <DropdownMenuSeparator />}
               {canArchive && (
                 <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                   <Archive className="mr-2 h-4 w-4" /> Archive
@@ -314,13 +319,19 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       <Dialog open={isDoctorFormOpen} onOpenChange={setIsDoctorFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingConsultation ? 'Edit Consultation' : 'Add New Consultation'}</DialogTitle>
+            <DialogTitle>
+                {editingConsultation?.doctorName === 'Patient Entry' 
+                    ? `Respond to ${patientName}'s Notes` 
+                    : editingConsultation 
+                    ? 'Edit Consultation' 
+                    : 'Add New Consultation'}
+            </DialogTitle>
             <DialogDescription>
-              Manage consultation records for {patientName}.
+              {editingConsultation?.doctorName === 'Patient Entry'
+                ? "Add your diagnosis and treatment plan in response to the patient's entry."
+                : `Manage consultation records for ${patientName}.`
+              }
               {user?.role === 'doctor' && !editingConsultation && ` This record will be attributed to you, Dr. ${user.name}.`}
-              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId === user.id && ` You are editing your entry.`}
-               {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorName === "Patient Entry" && ` You are responding to an entry made by the patient.`}
-              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId !== user.id && editingConsultation.doctorName !== "Patient Entry" && ` You are editing an entry made by Dr. ${editingConsultation.doctorName || 'another doctor'}.`}
             </DialogDescription>
           </DialogHeader>
           <ConsultationForm
