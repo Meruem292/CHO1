@@ -1,8 +1,9 @@
 
+
 import type { NavItem, UserRole } from '@/types';
 import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History } from 'lucide-react';
 
-export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];
+export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'midwife/nurse', 'patient'];
 
 // Note: For dynamic paths like '/users/[userId]/appointments',
 // the SidebarNavItems component will construct the full path using the logged-in user's ID.
@@ -14,7 +15,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    roles: ['admin', 'doctor', 'patient'],
+    roles: ['admin', 'doctor', 'midwife/nurse', 'patient'],
   },
   // Admin Specific
   {
@@ -47,36 +48,36 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BriefcaseMedical,
     roles: ['admin'],
   },
-  // Doctor Specific
+  // Doctor & Midwife/Nurse Specific
   {
     href: '/patients', // Doctors view their associated patients
     label: 'My Associated Patients',
     icon: Users,
-    roles: ['doctor'],
+    roles: ['doctor', 'midwife/nurse'],
   },
   {
     href: '/doctor/my-schedule', // Doctor manages their own schedule
     label: 'My Schedule',
     icon: CalendarPlus,
-    roles: ['doctor'],
+    roles: ['doctor', 'midwife/nurse'],
   },
   {
     href: '/doctor/my-appointments', // Doctor views their own appointments (redirects to /users/[doctorId]/appointments)
     label: 'My Appointments',
     icon: CalendarClock,
-    roles: ['doctor'],
+    roles: ['doctor', 'midwife/nurse'],
   },
   {
     href: '/doctor/activity-log',
     label: 'My Activity Log',
     icon: History,
-    roles: ['doctor'],
+    roles: ['doctor', 'midwife/nurse'],
   },
    {
     href: '/ai-suggestions',
     label: 'AI Health Suggestions',
     icon: Sparkles,
-    roles: ['admin', 'doctor'],
+    roles: ['admin', 'doctor', 'midwife/nurse'],
   },
   // Patient Specific
   {
@@ -122,21 +123,21 @@ export const PATIENT_NAV_ITEMS: NavItem[] = [
     href: '/consultations', // Appends to /patients/[patientId]
     label: 'Consultations',
     icon: ClipboardList,
-    roles: ['admin', 'doctor'],
+    roles: ['admin', 'doctor', 'midwife/nurse'],
     patientSpecific: true,
   },
   {
     href: '/maternity-history', // Appends to /patients/[patientId]
     label: 'Maternity History',
     icon: Baby,
-    roles: ['admin', 'doctor'],
+    roles: ['admin', 'doctor', 'midwife/nurse'],
     patientSpecific: true,
   },
   {
     href: '/baby-health', // Appends to /patients/[patientId]
     label: 'Baby Health Records',
     icon: HeartPulse,
-    roles: ['admin', 'doctor'],
+    roles: ['admin', 'doctor', 'midwife/nurse'],
     patientSpecific: true,
   },
   // This one would need to navigate to /users/[patientId]/appointments
@@ -153,5 +154,3 @@ export const PATIENT_NAV_ITEMS: NavItem[] = [
 ];
 
 export const APP_NAME = 'City Health Office';
-
-    

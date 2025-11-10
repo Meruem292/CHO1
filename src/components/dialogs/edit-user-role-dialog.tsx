@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -35,7 +36,7 @@ export function EditUserRoleDialog({
   onClose,
   user,
   onSave,
-  allowedRoles = ['admin', 'doctor', 'patient'], // Default to all roles if not specified
+  allowedRoles = ['admin', 'doctor', 'midwife/nurse', 'patient'], // Default to all roles if not specified
 }: EditUserRoleDialogProps) {
   const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,7 +90,7 @@ export function EditUserRoleDialog({
                     value={roleOption}
                     disabled={roleOption === 'admin' && user.role !== 'admin'} // Prevent changing to admin unless already admin
                   >
-                    {roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
+                    {roleOption === 'midwife/nurse' ? 'Midwife/Nurse' : roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
                   </SelectItem>
                 ))}
               </SelectContent>

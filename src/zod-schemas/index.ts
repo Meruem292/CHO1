@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 import { ALL_DAYS_OF_WEEK, type DayOfWeek } from '@/types';
 
@@ -26,7 +27,7 @@ export const adminCreateUserSchema = z.object({
   lastName: z.string().min(1, { message: "Last name is required." }).max(50),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  role: z.enum(['doctor', 'patient'], { message: "Role is required." }),
+  role: z.enum(['doctor', 'midwife/nurse', 'patient'], { message: "Role is required." }),
 });
 export type AdminCreateUserFormData = z.infer<typeof adminCreateUserSchema>;
 
@@ -65,7 +66,7 @@ export type PatientFormData = z.infer<typeof patientFormDataSchema>;
 export const patientSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
-  role: z.enum(['admin', 'doctor', 'patient']),
+  role: z.enum(['admin', 'doctor', 'midwife/nurse', 'patient']),
   firstName: z.string().min(1),
   middleName: z.string().optional(),
   lastName: z.string().min(1),

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState } from 'react';
@@ -174,7 +175,8 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="doctor">Doctor/Midwife</SelectItem>
+                      <SelectItem value="doctor">Doctor</SelectItem>
+                      <SelectItem value="midwife/nurse">Midwife/Nurse</SelectItem>
                       <SelectItem value="patient">Patient</SelectItem>
                     </SelectContent>
                   </Select>
