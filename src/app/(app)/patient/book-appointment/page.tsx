@@ -83,8 +83,8 @@ export default function PatientBookAppointmentPage() {
     addAppointment,
   } = useMockDb();
 
-  const [doctors, setDoctors] = useState<Patient[]>([]);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [providers, setProviders] = useState<Patient[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined); // This date is UTC start of day
   const [availableSlots, setAvailableSlots] = useState<Date[]>([]); // These slots are Date objects representing Manila time
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<Date | null>(null); // This is a Date object representing Manila time
@@ -94,32 +94,32 @@ export default function PatientBookAppointmentPage() {
 
   useEffect(() => {
     if (!patientsLoading) {
-      setDoctors(patients.filter(p => p.role === 'doctor'));
+      setProviders(patients.filter(p => p.role === 'doctor' || p.role === 'midwife/nurse'));
     }
   }, [patients, patientsLoading]);
 
   useEffect(() => {
     let unsubscribeSchedule: (() => void) | undefined;
-    if (selectedDoctorId) {
-      unsubscribeSchedule = getDoctorScheduleById(selectedDoctorId);
+    if (selectedProviderId) {
+      unsubscribeSchedule = getDoctorScheduleById(selectedProviderId);
     }
     return () => {
       if (unsubscribeSchedule) unsubscribeSchedule();
     };
-  }, [selectedDoctorId, getDoctorScheduleById]);
+  }, [selectedProviderId, getDoctorScheduleById]);
 
   useEffect(() => {
     let unsubscribeAppointments: (() => void) | undefined;
-    if (selectedDoctorId) {
-      unsubscribeAppointments = getAppointmentsByDoctorIdForBooking(selectedDoctorId);
+    if (selectedProviderId) {
+      unsubscribeAppointments = getAppointmentsByDoctorIdForBooking(selectedProviderId);
     }
     return () => {
       if (unsubscribeAppointments) unsubscribeAppointments();
     };
-  }, [selectedDoctorId, getAppointmentsByDoctorIdForBooking]);
+  }, [selectedProviderId, getAppointmentsByDoctorIdForBooking]);
 
   const calculateAvailableSlots = useCallback(() => {
-    if (!selectedDoctorId || !doctorSchedule || !selectedDate || doctorAppointmentsLoading) {
+    if (!selectedProviderId || !doctorSchedule || !selectedDate || doctorAppointmentsLoading) {
       setAvailableSlots([]);
       return;
     }
@@ -219,7 +219,7 @@ export default function PatientBookAppointmentPage() {
 
     setAvailableSlots(slots);
     setIsLoadingSlots(false);
-  }, [selectedDoctorId, doctorSchedule, selectedDate, doctorAppointmentsForBooking, doctorAppointmentsLoading]);
+  }, [selectedProviderId, doctorSchedule, selectedDate, doctorAppointmentsForBooking, doctorAppointmentsLoading]);
 
   useEffect(() => {
     calculateAvailableSlots();
@@ -243,7 +243,7 @@ export default function PatientBookAppointmentPage() {
   };
 
   const handleBookingSubmit = async (formData: AppointmentBookingFormDataType) => {
-    if (!user || !selectedDoctorId || !selectedDate || !selectedTimeSlot || !doctorSchedule) {
+    if (!user || !selectedProviderId || !selectedDate || !selectedTimeSlot || !doctorSchedule) {
       setBookingError("Missing required information. Please select doctor, date, and time.");
       return;
     }
@@ -255,7 +255,7 @@ export default function PatientBookAppointmentPage() {
 
     const newAppointment: Omit<Appointment, 'id' | 'patientName' | 'doctorName' | 'createdAt' | 'updatedAt'> = {
       patientId: user.id,
-      doctorId: selectedDoctorId,
+      doctorId: selectedProviderId,
       appointmentDateTimeStart: slotStartUTC.toISOString(),
       appointmentDateTimeEnd: slotEndUTC.toISOString(),
       durationMinutes: doctorSchedule.defaultSlotDurationMinutes,
@@ -267,11 +267,11 @@ export default function PatientBookAppointmentPage() {
       await addAppointment(newAppointment);
       toast({
         title: "Appointment Booked!",
-        description: `Your appointment with Dr. ${doctors.find(d => d.id === selectedDoctorId)?.name || 'Doctor'} on ${formatInPHTime(selectedDate, 'PPP')} at ${formatInPHTime(selectedTimeSlot, 'p')} is confirmed.`,
+        description: `Your appointment with ${providers.find(d => d.id === selectedProviderId)?.name || 'Provider'} on ${formatInPHTime(selectedDate, 'PPP')} at ${formatInPHTime(selectedTimeSlot, 'p')} is confirmed.`,
         variant: 'default',
       });
       // Reset selection after successful booking
-      setSelectedDoctorId(null); 
+      setSelectedProviderId(null); 
       setSelectedDate(undefined);
       setSelectedTimeSlot(null);
       setAvailableSlots([]);
@@ -300,9 +300,9 @@ export default function PatientBookAppointmentPage() {
     );
   }
 
-  const selectedDoctorDetails = useMemo(() => {
-    return doctors.find(d => d.id === selectedDoctorId);
-  }, [doctors, selectedDoctorId]);
+  const selectedProviderDetails = useMemo(() => {
+    return providers.find(d => d.id === selectedProviderId);
+  }, [providers, selectedProviderId]);
 
   return (
     <div className="space-y-8">
@@ -318,29 +318,29 @@ export default function PatientBookAppointmentPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Select a Doctor</CardTitle>
+          <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Select a Provider</CardTitle>
         </CardHeader>
         <CardContent>
           {patientsLoading ? (
             <Loader2 className="h-6 w-6 animate-spin" />
-          ) : doctors.length === 0 ? (
-            <p>No doctors available for booking at the moment.</p>
+          ) : providers.length === 0 ? (
+            <p>No doctors or midwives available for booking at the moment.</p>
           ) : (
             <Select 
               onValueChange={(value) => {
-                setSelectedDoctorId(value);
+                setSelectedProviderId(value);
                 setSelectedDate(undefined); // Reset date when doctor changes
                 setSelectedTimeSlot(null);
                 setAvailableSlots([]);
               }} 
-              value={selectedDoctorId || ""}
+              value={selectedProviderId || ""}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Choose a doctor" />
+                <SelectValue placeholder="Choose a doctor or midwife" />
               </SelectTrigger>
               <SelectContent>
-                {doctors.map(doc => (
-                  <SelectItem key={doc.id} value={doc.id}>{doc.name}</SelectItem>
+                {providers.map(prov => (
+                  <SelectItem key={prov.id} value={prov.id}>{prov.name} ({prov.role === 'midwife/nurse' ? 'Midwife' : 'Doctor'})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -348,25 +348,25 @@ export default function PatientBookAppointmentPage() {
         </CardContent>
       </Card>
 
-      {selectedDoctorId && (doctorScheduleLoading || doctorAppointmentsLoading) && (
+      {selectedProviderId && (doctorScheduleLoading || doctorAppointmentsLoading) && (
         <div className="flex items-center justify-center p-4">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <p className="ml-2">Loading doctor's availability...</p>
+          <p className="ml-2">Loading provider's availability...</p>
         </div>
       )}
 
-      {selectedDoctorId && !doctorScheduleLoading && !doctorSchedule && !doctorAppointmentsLoading && (
+      {selectedProviderId && !doctorScheduleLoading && !doctorSchedule && !doctorAppointmentsLoading && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Doctor Unavailable</AlertTitle>
+          <AlertTitle>Provider Unavailable</AlertTitle>
           <AlertDescription>
-            This doctor has not set up their schedule yet or is currently unavailable for booking.
-            Please select another doctor or check back later.
+            This provider has not set up their schedule yet or is currently unavailable for booking.
+            Please select another provider or check back later.
           </AlertDescription>
         </Alert>
       )}
 
-      {selectedDoctorId && !doctorScheduleLoading && doctorSchedule && (
+      {selectedProviderId && !doctorScheduleLoading && doctorSchedule && (
         <>
           <Card>
             <CardHeader>
@@ -402,7 +402,7 @@ export default function PatientBookAppointmentPage() {
               <CardHeader>
                 <CardTitle className="flex items-center"><Clock className="mr-2 h-5 w-5 text-primary" />Select a Time Slot</CardTitle>
                 <CardDescription>
-                  Showing available slots for {formatInPHTime(selectedDate, 'PPP')} with Dr. {selectedDoctorDetails?.name}.
+                  Showing available slots for {formatInPHTime(selectedDate, 'PPP')} with {selectedProviderDetails?.name}.
                   Appointments are approximately {doctorSchedule.defaultSlotDurationMinutes} minutes. Timezone: Asia/Manila.
                 </CardDescription>
               </CardHeader>
@@ -425,8 +425,8 @@ export default function PatientBookAppointmentPage() {
                      <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>No Slots Available</AlertTitle>
                     <AlertDescription>
-                      There are no available slots for this doctor on the selected date. Please try another date or doctor.
-                      This could be due to the doctor's schedule, existing bookings, or the notice period for new appointments.
+                      There are no available slots for this provider on the selected date. Please try another date or provider.
+                      This could be due to the provider's schedule, existing bookings, or the notice period for new appointments.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -450,7 +450,7 @@ export default function PatientBookAppointmentPage() {
                 <AppointmentBookingForm
                   onSubmit={handleBookingSubmit}
                   isLoading={isBooking}
-                  selectedDoctorName={selectedDoctorDetails?.name}
+                  selectedDoctorName={selectedProviderDetails?.name}
                   selectedDate={selectedDate ? formatInPHTime(selectedDate, 'PPP') : undefined}
                   selectedTimeSlot={selectedTimeSlot ? formatInPHTime(selectedTimeSlot, 'p') : undefined}
                 />
@@ -462,4 +462,3 @@ export default function PatientBookAppointmentPage() {
     </div>
   );
 }
-

@@ -40,8 +40,8 @@ export default function AdminManageSchedulesPage() {
     };
   }, [getAllDoctorSchedules]);
 
-  const doctors = useMemo(() => {
-    return patients.filter(p => p.role === 'doctor');
+  const providersWithSchedule = useMemo(() => {
+    return patients.filter(p => p.role === 'doctor' || p.role === 'midwife/nurse');
   }, [patients]);
 
   if (!user || user.role !== 'admin') {
@@ -63,11 +63,11 @@ export default function AdminManageSchedulesPage() {
 
   const isLoading = patientsLoading || allDoctorSchedulesLoading;
 
-  if (isLoading && doctors.length === 0 && allDoctorSchedules.length === 0) {
+  if (isLoading && providersWithSchedule.length === 0 && allDoctorSchedules.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Loading doctor schedules...</p>
+        <p className="ml-2">Loading provider schedules...</p>
       </div>
     );
   }
@@ -80,35 +80,36 @@ export default function AdminManageSchedulesPage() {
       </Link>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline flex items-center">
-          <BriefcaseMedical className="mr-3 h-8 w-8 text-primary" /> Manage Doctor Schedules
+          <BriefcaseMedical className="mr-3 h-8 w-8 text-primary" /> Manage Provider Schedules
         </h1>
       </div>
       <p className="text-muted-foreground">
-        View the availability schedules for all doctors/midwives.
+        View the availability schedules for all doctors and midwives.
       </p>
 
-      {doctors.length === 0 && !isLoading ? (
+      {providersWithSchedule.length === 0 && !isLoading ? (
         <Alert>
           <UserCircle className="h-4 w-4" />
-          <AlertTitle>No Doctors Found</AlertTitle>
-          <AlertDescription>There are no doctors in the system to display schedules for.</AlertDescription>
+          <AlertTitle>No Providers Found</AlertTitle>
+          <AlertDescription>There are no doctors or midwives in the system to display schedules for.</AlertDescription>
         </Alert>
-      ) : allDoctorSchedules.length === 0 && !isLoading && doctors.length > 0 ? (
+      ) : allDoctorSchedules.length === 0 && !isLoading && providersWithSchedule.length > 0 ? (
          <Alert>
           <CalendarDays className="h-4 w-4" />
           <AlertTitle>No Schedules Configured</AlertTitle>
-          <AlertDescription>None of the doctors have configured their schedules yet.</AlertDescription>
+          <AlertDescription>None of the providers have configured their schedules yet.</AlertDescription>
         </Alert>
       ) : (
         <Accordion type="multiple" className="w-full space-y-4">
-          {doctors.map((doctor) => {
-            const schedule = allDoctorSchedules.find(s => s.doctorId === doctor.id);
+          {providersWithSchedule.map((provider) => {
+            const schedule = allDoctorSchedules.find(s => s.doctorId === provider.id);
             return (
-              <AccordionItem value={doctor.id} key={doctor.id} className="border rounded-lg shadow-sm bg-card">
+              <AccordionItem value={provider.id} key={provider.id} className="border rounded-lg shadow-sm bg-card">
                 <AccordionTrigger className="px-6 py-4 hover:no-underline">
                   <div className="flex items-center space-x-3">
                     <UserCircle className="h-6 w-6 text-primary" />
-                    <span className="text-lg font-semibold">{doctor.name}</span>
+                    <span className="text-lg font-semibold">{provider.name}</span>
+                    <Badge variant="outline">{provider.role === 'midwife/nurse' ? 'Midwife/Nurse' : 'Doctor'}</Badge>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-6 pb-6 space-y-4">
@@ -116,7 +117,7 @@ export default function AdminManageSchedulesPage() {
                     <Alert variant="destructive">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>No Schedule Found</AlertTitle>
-                      <AlertDescription>This doctor has not configured their schedule yet.</AlertDescription>
+                      <AlertDescription>This provider has not configured their schedule yet.</AlertDescription>
                     </Alert>
                   ) : (
                     <div className="space-y-3 text-sm">
@@ -160,7 +161,7 @@ export default function AdminManageSchedulesPage() {
                     </div>
                   )}
                    <div className="mt-4">
-                      <Link href={`/doctor/my-schedule?doctorId=${doctor.id}`} passHref legacyBehavior>
+                      <Link href={`/doctor/my-schedule?doctorId=${provider.id}`} passHref legacyBehavior>
                         <a className="text-sm text-primary hover:underline">View/Edit Full Schedule &raquo;</a>
                       </Link>
                     </div>

@@ -16,26 +16,27 @@ export default function DoctorMySchedulePage() {
   const { getDoctorScheduleById, saveDoctorSchedule, doctorSchedule, doctorScheduleLoading } = useMockDb();
   const [isSaving, setIsSaving] = useState(false);
 
+  const canManageSchedule = user?.role === 'doctor' || user?.role === 'midwife/nurse';
+
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    if (user?.role === 'doctor' && user.id) {
+    if (canManageSchedule && user?.id) {
       unsubscribe = getDoctorScheduleById(user.id);
     }
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user, getDoctorScheduleById]);
+  }, [user, canManageSchedule, getDoctorScheduleById]);
 
-  if (!user || (user.role !== 'doctor' && user.role !== 'admin')) {
-    // Allow admin to potentially view, but not edit directly here for now.
-    // Doctor is the primary editor of their own schedule.
+  if (!user || (!canManageSchedule && user.role !== 'admin')) {
+    // Admins can view this page but won't see a form.
      return (
       <div className="space-y-6">
         <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Access Denied</AlertTitle>
             <AlertDescription>
-            This page is for doctors to manage their schedule. Admins can view schedules via the Admin section.
+            This page is for Doctors and Midwives to manage their schedule.
             </AlertDescription>
         </Alert>
          <Link href="/dashboard" className="text-primary hover:underline">
@@ -46,8 +47,8 @@ export default function DoctorMySchedulePage() {
   }
 
   const handleSaveSchedule = async (data: DoctorScheduleFormData) => {
-    if (!user || user.role !== 'doctor') {
-      toast({ variant: "destructive", title: "Error", description: "Only doctors can save their schedule." });
+    if (!user || !canManageSchedule) {
+      toast({ variant: "destructive", title: "Error", description: "Only authorized personnel can save a schedule." });
       return;
     }
     setIsSaving(true);
@@ -64,7 +65,7 @@ export default function DoctorMySchedulePage() {
     }
   };
   
-  if (doctorScheduleLoading && user?.role === 'doctor') {
+  if (doctorScheduleLoading && canManageSchedule) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -88,7 +89,7 @@ export default function DoctorMySchedulePage() {
         Set your working hours, default appointment duration, and manage your availability.
       </p>
       
-      {user?.role === 'doctor' && user.id && (
+      {canManageSchedule && user.id && (
         <DoctorScheduleForm
           doctorId={user.id}
           currentSchedule={doctorSchedule}
@@ -102,8 +103,8 @@ export default function DoctorMySchedulePage() {
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Admin View</AlertTitle>
             <AlertDescription>
-                You are viewing this page as an admin. Schedule editing is done by doctors themselves.
-                You can manage all doctor schedules from the <Link href="/admin/schedules" className="font-medium text-primary hover:underline">Doctor Schedules</Link> page.
+                You are viewing this page as an admin. Schedule editing is done by doctors or midwives themselves.
+                You can view all schedules from the <Link href="/admin/schedules" className="font-medium text-primary hover:underline">Doctor Schedules</Link> page.
             </AlertDescription>
         </Alert>
       )}
