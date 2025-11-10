@@ -111,7 +111,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     if (viewingUser) {
       if (viewingUser.role === 'patient') {
         unsubscribeAppointments = getAppointmentsByPatientId(viewingUser.id);
-      } else if (viewingUser.role === 'doctor') {
+      } else if (viewingUser.role === 'doctor' || viewingUser.role === 'midwife/nurse') {
         unsubscribeAppointments = getAppointmentsByDoctorId(viewingUser.id);
       }
     }
@@ -124,7 +124,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     if (!currentUser || !appointment) return false;
     if (currentUser.role === 'admin') return true;
     if (currentUser.role === 'patient' && currentUser.id === appointment.patientId) return true;
-    if (currentUser.role === 'doctor' && currentUser.id === appointment.doctorId) return true;
+    if ((currentUser.role === 'doctor' || currentUser.role === 'midwife/nurse') && currentUser.id === appointment.doctorId) return true;
     return false;
   };
 
@@ -192,7 +192,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
       header: 'Doctor',
       cell: ({ row }: { row: { original?: Appointment } }) => row.original?.doctorName || 'N/A',
     }] : []),
-    ...(viewingUser?.role === 'doctor' ? [{
+    ...((viewingUser?.role === 'doctor' || viewingUser?.role === 'midwife/nurse') ? [{
       accessorKey: 'patientName',
       header: 'Patient',
       cell: ({ row }: { row: { original?: Appointment } }) => row.original?.patientName || 'N/A',
@@ -231,7 +231,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         }
         
         const showCancelButton = canManageThisAppointment(appointment) && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
-        const showViewPatientRecordsButton = (currentUser?.role === 'admin' || (currentUser?.role === 'doctor' && currentUser.id === viewingUserId)) && viewingUser?.role === 'doctor' && appointment.patientId;
+        const showViewPatientRecordsButton = (currentUser?.role === 'admin' || ((currentUser?.role === 'doctor' || currentUser?.role === 'midwife/nurse') && currentUser.id === viewingUserId)) && (viewingUser?.role === 'doctor' || viewingUser?.role === 'midwife/nurse') && appointment.patientId;
         // Show Start Consultation button if current user is the doctor for this appointment AND status is 'scheduled' (future or past)
         // (Can add consultation for past scheduled appointments that were missed)
         const showStartConsultationButton = currentUser?.role === 'doctor' && currentUser.id === appointment.doctorId && appointment.status === 'scheduled';
@@ -266,7 +266,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     },
   ], [viewingUser?.role, currentUser, viewingUserId, addConsultation, updateAppointmentStatus]);
 
-  if (viewingUserLoading || (viewingUser && appointmentsLoading && userSpecificAppointments.length === 0 && !viewingUser)) {
+  if (viewingUserLoading || (viewingUser && appointmentsLoading)) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -311,14 +311,12 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">
           {currentUser.id === viewingUserId ? "My Appointments" : `Appointments for ${viewingUser.name}`}
-          {viewingUser.role === 'doctor' && currentUser.id !== viewingUserId && " (Doctor)"}
+          {(viewingUser.role === 'doctor' || viewingUser.role === 'midwife/nurse') && currentUser.id !== viewingUserId && ` (${viewingUser.role.charAt(0).toUpperCase() + viewingUser.role.slice(1)})`}
           {viewingUser.role === 'patient' && currentUser.id !== viewingUserId && " (Patient)"}
         </h1>
       </div>
 
-      {appointmentsLoading && userSpecificAppointments.length === 0 ? (
-         <div className="flex items-center justify-center h-40"> <Loader2 className="h-6 w-6 animate-spin text-primary" /> <p className="ml-2">Loading appointments...</p></div>
-      ) :userSpecificAppointments.length === 0 ? (
+      {userSpecificAppointments.length === 0 ? (
         <Alert>
           <CalendarClock className="h-4 w-4" />
           <AlertTitle>No Appointments</AlertTitle>
