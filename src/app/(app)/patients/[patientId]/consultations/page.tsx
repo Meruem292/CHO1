@@ -41,6 +41,7 @@ import { toast } from '@/hooks/use-toast';
 import { parseISO } from 'date-fns';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
+import Link from 'next/link';
 
 
 const PH_TIMEZONE = 'Asia/Manila';
@@ -225,9 +226,9 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         const isPatientEntry = consultation.doctorName === "Patient Entry";
         const canEditOwn = user?.role === 'doctor' && user.id === consultation.doctorId;
         const canRespondToPatient = user?.role === 'doctor' && isPatientEntry;
-        const canArchive = user?.role === 'admin' || canEditOwn || canRespondToPatient;
+        const canArchive = user?.role === 'admin' || canEditOwn;
 
-        if (!canArchive) return null;
+        if (!canArchive && !canEditOwn && !canRespondToPatient) return null;
 
         return (
           <DropdownMenu>
@@ -240,9 +241,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               {canRespondToPatient && (
-                <DropdownMenuItem onClick={() => openEditForm(consultation)}>
-                  <MessageSquarePlus className="mr-2 h-4 w-4" /> Respond
-                </DropdownMenuItem>
+                <Link href={`/patients/${patientId}/consultations/${consultation.id}/respond`} passHref>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <MessageSquarePlus className="mr-2 h-4 w-4" /> Respond
+                  </DropdownMenuItem>
+                </Link>
               )}
                {canEditOwn && (
                 <DropdownMenuItem onClick={() => openEditForm(consultation)}>
@@ -260,7 +263,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         );
       },
     },
-  ], [user?.role, user?.id, openEditForm, setConsultationToArchive]);
+  ], [user?.role, user?.id, openEditForm, setConsultationToArchive, patientId]);
 
 
   if (user?.role === 'midwife/nurse') {
@@ -315,22 +318,17 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         />
       )}
 
-      {/* Dialog for Doctor's Form */}
+      {/* Dialog for Doctor's Form (for NEW consultations) */}
       <Dialog open={isDoctorFormOpen} onOpenChange={setIsDoctorFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-                {editingConsultation?.doctorName === 'Patient Entry' 
-                    ? `Respond to ${patientName}'s Notes` 
-                    : editingConsultation 
+                {editingConsultation 
                     ? 'Edit Consultation' 
                     : 'Add New Consultation'}
             </DialogTitle>
             <DialogDescription>
-              {editingConsultation?.doctorName === 'Patient Entry'
-                ? "Add your diagnosis and treatment plan in response to the patient's entry."
-                : `Manage consultation records for ${patientName}.`
-              }
+              Manage consultation records for {patientName}.
               {user?.role === 'doctor' && !editingConsultation && ` This record will be attributed to you, Dr. ${user.name}.`}
             </DialogDescription>
           </DialogHeader>
