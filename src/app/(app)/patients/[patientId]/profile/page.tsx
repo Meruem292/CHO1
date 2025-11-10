@@ -9,12 +9,14 @@ import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, User, ShieldAlert, AlertTriangle, Edit } from 'lucide-react';
+import { Loader2, User, ShieldAlert, AlertTriangle, Edit, Ruler, Weight, HeartPulse } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { PatientForm } from '@/components/forms/patient-form';
 import type { PatientFormData } from '@/zod-schemas';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -39,13 +41,15 @@ interface PatientProfilePageProps {
 export default function PatientProfilePage({ params: paramsPromise }: PatientProfilePageProps) {
   const actualParams = use(paramsPromise);
   const { patientId } = actualParams;
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const { updatePatient } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // Only for admin to toggle form
+  const [isEditing, setIsEditing] = useState(false);
+
+  const canEditProfile = user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse';
 
   useEffect(() => {
     if (!patientId) {
@@ -81,9 +85,10 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
       const updatesForDb: Partial<Omit<Patient, 'id' | 'role' | 'createdAt' | 'updatedAt'>> = {
         ...formData,
         name,
+        // Coerce to number or null, ensuring empty strings become null
+        weightKg: formData.weightKg ? Number(formData.weightKg) : undefined,
+        heightM: formData.heightM ? Number(formData.heightM) : undefined,
       };
-      // Ensure empty strings are converted to null or handled if your DB expects that
-      // For Firebase RTDB, empty strings are fine, or you can delete keys if needed.
 
       await updatePatient(patient.id, updatesForDb);
       toast({ title: "Patient Profile Updated", description: `${name}'s profile has been successfully updated.` });
@@ -126,8 +131,25 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     ) : null
   );
 
-  // Admin view: Editable form
-  if (user?.role === 'admin' && isEditing) {
+  const calculateBmi = () => {
+    if (patient.weightKg && patient.heightM && patient.heightM > 0) {
+      return (patient.weightKg / (patient.heightM * patient.heightM)).toFixed(2);
+    }
+    return null;
+  };
+
+  const getBmiCategory = (bmi: number) => {
+    if (bmi < 18.5) return { category: 'Underweight', variant: 'destructive' as const };
+    if (bmi >= 18.5 && bmi <= 24.9) return { category: 'Normal weight', variant: 'default' as const };
+    if (bmi >= 25 && bmi <= 29.9) return { category: 'Overweight', variant: 'secondary' as const };
+    return { category: 'Obesity', variant: 'destructive' as const };
+  };
+
+  const bmi = calculateBmi();
+  const bmiInfo = bmi ? getBmiCategory(parseFloat(bmi)) : null;
+
+  // Admin/Provider view: Editable form
+  if (canEditProfile && isEditing) {
     return (
       <Card>
         <CardHeader>
@@ -144,20 +166,21 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
             patient={patient}
             onSubmit={handleUpdatePatient}
             isLoading={isUpdating}
-            onCancel={() => setIsEditing(false)} // Optional: PatientForm onCancel could also set isEditing to false
+            onCancel={() => setIsEditing(false)}
+            isProviderEditing={user?.role === 'doctor' || user?.role === 'midwife/nurse'}
           />
         </CardContent>
       </Card>
     );
   }
 
-  // Default read-only view for everyone, or admin before clicking "Edit"
+  // Default read-only view for everyone, or provider before clicking "Edit"
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Patient Profile Details</span>
-          {user?.role === 'admin' && !isEditing && (
+          {canEditProfile && !isEditing && (
             <Button onClick={() => setIsEditing(true)}>
               <Edit className="mr-2 h-4 w-4" /> Edit Profile
             </Button>
@@ -178,11 +201,32 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
           <InfoItem label="Nationality" value={patient.nationality} />
           <InfoItem label="Address" value={`${patient.city ? patient.city + ', ' : ''}${patient.municipal || ''}`} />
         </div>
+        <Separator />
+        <h3 className="text-lg font-medium text-primary">Physical Measurements</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <InfoItem label="Weight" value={patient.weightKg ? `${patient.weightKg} kg` : 'N/A'} />
+          <InfoItem label="Height" value={patient.heightM ? `${patient.heightM} m` : 'N/A'} />
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">BMI</p>
+            {bmi ? (
+              <div className="flex items-center space-x-2">
+                <p className="text-md font-semibold">{bmi}</p>
+                <Badge variant={bmiInfo?.variant}>{bmiInfo?.category}</Badge>
+              </div>
+            ) : (
+              <p className="text-md">N/A</p>
+            )}
+          </div>
+        </div>
+        <Separator />
+        <h3 className="text-lg font-medium text-primary">Socio-Economic Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <InfoItem label="Highest Education" value={patient.highestEducation} />
           <InfoItem label="Occupation" value={patient.occupation} />
           <InfoItem label="Monthly Income" value={patient.monthlyIncome} />
         </div>
+        <Separator />
+        <h3 className="text-lg font-medium text-primary">Health & Membership</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <InfoItem label="PhilHealth Member" value={patient.philhealthMember} />
           <InfoItem label="PhilHealth Number" value={patient.philhealthNumber} />
@@ -191,13 +235,15 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
           <InfoItem label="Blood Type" value={patient.bloodType} />
         </div>
         {patient.remarks && (
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Remarks</p>
-            <p className="text-md whitespace-pre-wrap">{patient.remarks}</p>
-          </div>
+          <>
+            <Separator />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Remarks</p>
+              <p className="text-md whitespace-pre-wrap">{patient.remarks}</p>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
   );
 }
-

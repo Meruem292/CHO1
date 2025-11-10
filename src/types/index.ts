@@ -31,6 +31,8 @@ export interface PatientFormData {
   householdMember?: 'yes' | 'no';
   bloodType?: string;
   remarks?: string;
+  weightKg?: number;
+  heightM?: number;
 }
 
 // This reflects the structure in Firebase, including the combined 'name' and 'role'
@@ -211,5 +213,3 @@ export interface AuditLog {
   description: string; // Human-readable description of the action
   details?: Record<string, any>; // For storing before/after states or other metadata
 }
-
-    

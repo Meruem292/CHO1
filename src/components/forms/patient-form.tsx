@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { patientFormDataSchema, type PatientFormData } from '@/zod-schemas';
 import type { Patient } from '@/types';
-import { CalendarIcon, Save, Loader2 } from 'lucide-react';
+import { CalendarIcon, Save, Loader2, Weight, Ruler } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -37,6 +37,7 @@ interface PatientFormProps {
   onSubmit: (data: PatientFormData) => Promise<void>; // Make onSubmit async for parent to handle loading
   onCancel?: () => void;
   isLoading?: boolean; // Prop to indicate if submission is in progress
+  isProviderEditing?: boolean; // True if a doctor or midwife is editing
 }
 
 const formStructure = [
@@ -60,6 +61,14 @@ const formStructure = [
       { name: 'email', label: 'Email Address', placeholder: 'juan@example.com' },
       { name: 'municipal', label: 'Municipal (Optional)', placeholder: 'e.g., Alaminos' },
       { name: 'city', label: 'City (Optional)', placeholder: 'e.g., San Pablo' },
+    ]
+  },
+   {
+    sectionTitle: "Physical Measurements",
+    providerOnly: true,
+    fields: [
+      { name: 'weightKg', label: 'Weight (kg)', placeholder: 'e.g., 65.5', type: 'number' },
+      { name: 'heightM', label: 'Height (m)', placeholder: 'e.g., 1.75', type: 'number' },
     ]
   },
   {
@@ -112,11 +121,13 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
     householdMember: patient?.householdMember || undefined,
     bloodType: patient?.bloodType || '',
     remarks: patient?.remarks || '',
+    weightKg: patient?.weightKg || undefined,
+    heightM: patient?.heightM || undefined,
   };
 };
 
 
-export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: PatientFormProps) {
+export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, isProviderEditing = false }: PatientFormProps) {
   const form = useForm<PatientFormData>({
     resolver: zodResolver(patientFormDataSchema),
     defaultValues: getInitialFormValues(patient),
@@ -129,7 +140,7 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
   const handleFormSubmit = async (data: PatientFormData) => {
     // Convert undefined values to null for Firebase compatibility
     const sanitizedData = Object.entries(data).reduce((acc, [key, value]) => {
-      acc[key as keyof PatientFormData] = value === undefined ? null : value;
+      acc[key as keyof PatientFormData] = value === undefined || value === '' ? null : value;
       return acc;
     }, {} as PatientFormData);
     await onSubmit(sanitizedData);
@@ -181,48 +192,57 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
           )}
         />
 
-        {formStructure.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="space-y-4">
-            <h3 className="text-lg font-medium text-primary">{section.sectionTitle}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-              {section.fields.map((fieldConfig) => (
-                <FormField
-                  key={fieldConfig.name}
-                  control={form.control}
-                  name={fieldConfig.name as keyof PatientFormData}
-                  render={({ field }) => (
-                    <FormItem className={fieldConfig.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
-                      <FormLabel>{fieldConfig.label}</FormLabel>
-                      {fieldConfig.type === 'select' ? (
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+        {formStructure.map((section, sectionIndex) => {
+          if (section.providerOnly && !isProviderEditing) return null;
+          return (
+            <div key={sectionIndex} className="space-y-4">
+              <h3 className="text-lg font-medium text-primary">{section.sectionTitle}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                {section.fields.map((fieldConfig) => (
+                  <FormField
+                    key={fieldConfig.name}
+                    control={form.control}
+                    name={fieldConfig.name as keyof PatientFormData}
+                    render={({ field }) => (
+                      <FormItem className={fieldConfig.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
+                        <FormLabel>{fieldConfig.label}</FormLabel>
+                        {fieldConfig.type === 'select' ? (
+                          <Select onValueChange={field.onChange} value={field.value as string | undefined} disabled={isLoading}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={fieldConfig.placeholder || "Select an option"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {fieldConfig.options?.map(option => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : fieldConfig.type === 'textarea' ? (
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={fieldConfig.placeholder || "Select an option"} />
-                            </SelectTrigger>
+                            <Textarea placeholder={fieldConfig.placeholder} {...field} value={field.value as string || ''} rows={3} disabled={isLoading} />
                           </FormControl>
-                          <SelectContent>
-                            {fieldConfig.options?.map(option => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : fieldConfig.type === 'textarea' ? (
-                        <FormControl>
-                          <Textarea placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} rows={3} disabled={isLoading} />
-                        </FormControl>
-                      ) : (
-                        <FormControl>
-                          <Input placeholder={fieldConfig.placeholder} {...field} disabled={isLoading || fieldConfig.name === 'municipal' || fieldConfig.name === 'city'} />
-                        </FormControl>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
+                        ) : (
+                          <FormControl>
+                             <Input
+                                type={fieldConfig.type || 'text'}
+                                placeholder={fieldConfig.placeholder}
+                                {...field}
+                                value={field.value ?? ''} // Handle null/undefined for input value
+                                disabled={isLoading || fieldConfig.name === 'municipal' || fieldConfig.name === 'city'}
+                              />
+                          </FormControl>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && (
