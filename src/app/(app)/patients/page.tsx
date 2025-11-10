@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Eye, Loader2, Users } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Archive, Edit, Eye, Loader2, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -136,11 +136,11 @@ export default function PatientsPage() {
     if (patientToDelete) {
       try {
         await deletePatient(patientToDelete.id);
-        toast({ title: "Patient Deleted", description: `${patientToDelete.name} has been deleted.` });
+        toast({ title: "Patient Archived", description: `${patientToDelete.name} has been archived.` });
         setPatientToDelete(null);
       } catch (error) {
         console.error("Error deleting patient:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete patient." });
+        toast({ variant: "destructive", title: "Error", description: "Failed to archive patient." });
       }
     }
   };
@@ -200,7 +200,7 @@ export default function PatientsPage() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setPatientToDelete(patient)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Patient
+                    <Archive className="mr-2 h-4 w-4" /> Archive Patient
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -290,14 +290,14 @@ export default function PatientsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the patient 
+                This action cannot be undone. This will permanently archive the patient 
                 "{patientToDelete.name}" and all their associated records (consultations, maternity, baby health).
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setPatientToDelete(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                Delete
+                Archive
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
