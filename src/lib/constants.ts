@@ -58,7 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/audit-log',
     label: 'Audit Log',
     icon: ListOrdered,
-    roles: ['admin', 'doctor'],
+    roles: ['admin'],
   },
   // Doctor & Midwife/Nurse Specific
   {
