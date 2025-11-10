@@ -32,8 +32,6 @@ export interface PatientFormData {
   householdMember?: 'yes' | 'no';
   bloodType?: string;
   remarks?: string;
-  weightKg?: number;
-  heightM?: number;
 }
 
 // This reflects the structure in Firebase, including the combined 'name' and 'role'

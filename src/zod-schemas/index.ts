@@ -58,8 +58,6 @@ export const patientFormDataSchema = z.object({
   householdMember: z.enum(['yes', 'no']).optional(),
   bloodType: z.string().optional().default(''),
   remarks: z.string().optional().default(''),
-  weightKg: z.coerce.number().positive("Weight must be positive.").optional().or(z.literal('')),
-  heightM: z.coerce.number().positive("Height must be positive.").optional().or(z.literal('')),
 });
 export type PatientFormData = z.infer<typeof patientFormDataSchema>;
 
@@ -90,8 +88,6 @@ export const patientSchema = z.object({
   householdMember: z.enum(['yes', 'no']).optional(),
   bloodType: z.string().optional(),
   remarks: z.string().optional(),
-  weightKg: z.number().positive().optional(),
-  heightM: z.number().positive().optional(),
 });
 
 

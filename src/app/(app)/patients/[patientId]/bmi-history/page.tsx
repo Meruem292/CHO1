@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { use, useEffect, useMemo } from 'react';
+import React, { use, useEffect, useMemo, useState } from 'react';
 import type { BmiRecord } from '@/types';
 import { useMockDb } from '@/hooks/use-mock-db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,9 @@ import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, L
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format, parseISO } from 'date-fns';
+import { BmiRecordingForm } from '@/components/forms/bmi-recording-form';
+import { useAuth } from '@/hooks/use-auth-hook';
+import { toast } from '@/hooks/use-toast';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -35,7 +38,9 @@ interface BmiHistoryPageProps {
 export default function BmiHistoryPage({ params: paramsPromise }: BmiHistoryPageProps) {
   const actualParams = use(paramsPromise);
   const { patientId } = actualParams;
-  const { bmiHistory, bmiHistoryLoading, getBmiHistoryByPatientId } = useMockDb();
+  const { user } = useAuth();
+  const { bmiHistory, bmiHistoryLoading, getBmiHistoryByPatientId, addBmiRecord } = useMockDb();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = getBmiHistoryByPatientId(patientId);
@@ -43,6 +48,32 @@ export default function BmiHistoryPage({ params: paramsPromise }: BmiHistoryPage
       if (unsubscribe) unsubscribe();
     };
   }, [patientId, getBmiHistoryByPatientId]);
+
+  const canRecordBmi = user?.role === 'doctor' || user?.role === 'midwife/nurse';
+
+  const handleBmiSubmit = async (data: { weightKg: number; heightM: number }) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const bmi = parseFloat((data.weightKg / (data.heightM * data.heightM)).toFixed(2));
+      const bmiRecord: Omit<BmiRecord, 'id' | 'createdAt'> = {
+        patientId: patientId,
+        date: new Date().toISOString(),
+        weightKg: data.weightKg,
+        heightM: data.heightM,
+        bmi: bmi,
+        recordedById: user.id,
+        recordedByName: user.name,
+      };
+      await addBmiRecord(bmiRecord);
+      toast({ title: 'Success', description: 'New BMI record has been saved.' });
+    } catch (error) {
+      console.error("Error saving BMI record:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save BMI record.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const chartData = useMemo(() => {
     return bmiHistory.map(record => ({
@@ -90,12 +121,15 @@ export default function BmiHistoryPage({ params: paramsPromise }: BmiHistoryPage
 
   return (
     <div className="space-y-6 mt-6">
+      {canRecordBmi && <BmiRecordingForm onSubmit={handleBmiSubmit} isLoading={isSubmitting} />}
+
       {bmiHistory.length === 0 ? (
         <Alert>
           <TrendingUp className="h-4 w-4" />
           <AlertTitle>No BMI History Found</AlertTitle>
           <AlertDescription>
-            There are no weight and height records to display a BMI history. Records are added when a provider updates the patient's profile.
+            There are no weight and height records to display a BMI history. 
+            {canRecordBmi && " Use the form above to add the first measurement."}
           </AlertDescription>
         </Alert>
       ) : (

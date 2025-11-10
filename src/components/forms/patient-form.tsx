@@ -63,14 +63,6 @@ const formStructure = [
       { name: 'city', label: 'City (Optional)', placeholder: 'e.g., San Pablo' },
     ]
   },
-   {
-    sectionTitle: "Physical Measurements",
-    providerOnly: true,
-    fields: [
-      { name: 'weightKg', label: 'Weight (kg)', placeholder: 'e.g., 65.5', type: 'number' },
-      { name: 'heightM', label: 'Height (m)', placeholder: 'e.g., 1.75', type: 'number' },
-    ]
-  },
   {
     sectionTitle: "Socio-Economic Information",
     fields: [
@@ -121,8 +113,7 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
     householdMember: patient?.householdMember || undefined,
     bloodType: patient?.bloodType || '',
     remarks: patient?.remarks || '',
-    weightKg: patient?.weightKg || undefined,
-    heightM: patient?.heightM || undefined,
+    // weightKg and heightM are removed from here
   };
 };
 

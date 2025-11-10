@@ -42,7 +42,7 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
   const actualParams = use(paramsPromise);
   const { patientId } = actualParams;
   const { user } = useAuth();
-  const { updatePatient } = useMockDb();
+  const { updatePatient, bmiHistory, getBmiHistoryByPatientId } = useMockDb();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,8 +58,9 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     }
     setIsLoading(true);
     setIsEditing(false); // Reset editing state on patient change
+    
     const patientRecordRef = dbRef(database, `patients/${patientId}`);
-    const unsubscribe = onValue(patientRecordRef, (snapshot) => {
+    const unsubscribePatient = onValue(patientRecordRef, (snapshot) => {
       if (snapshot.exists()) {
         setPatient({ id: snapshot.key!, ...snapshot.val() } as Patient);
       } else {
@@ -71,8 +72,14 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
       setPatient(null);
       setIsLoading(false);
     });
-    return () => unsubscribe();
-  }, [patientId]);
+
+    const unsubscribeBmi = getBmiHistoryByPatientId(patientId);
+    
+    return () => {
+      unsubscribePatient();
+      unsubscribeBmi();
+    }
+  }, [patientId, getBmiHistoryByPatientId]);
 
   const handleUpdatePatient = async (formData: PatientFormData) => {
     if (!patient) return;
@@ -85,9 +92,6 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
       const updatesForDb: Partial<Omit<Patient, 'id' | 'role' | 'createdAt' | 'updatedAt'>> = {
         ...formData,
         name,
-        // Coerce to number or null, ensuring empty strings become null
-        weightKg: formData.weightKg ? Number(formData.weightKg) : undefined,
-        heightM: formData.heightM ? Number(formData.heightM) : undefined,
       };
 
       await updatePatient(patient.id, updatesForDb);
@@ -131,12 +135,7 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     ) : null
   );
 
-  const calculateBmi = () => {
-    if (patient.weightKg && patient.heightM && patient.heightM > 0) {
-      return (patient.weightKg / (patient.heightM * patient.heightM)).toFixed(2);
-    }
-    return null;
-  };
+  const lastBmiRecord = bmiHistory.length > 0 ? bmiHistory[bmiHistory.length - 1] : null;
 
   const getBmiCategory = (bmi: number) => {
     if (bmi < 18.5) return { category: 'Underweight', variant: 'destructive' as const };
@@ -144,9 +143,9 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
     if (bmi >= 25 && bmi <= 29.9) return { category: 'Overweight', variant: 'secondary' as const };
     return { category: 'Obesity', variant: 'destructive' as const };
   };
+  
+  const bmiInfo = lastBmiRecord ? getBmiCategory(lastBmiRecord.bmi) : null;
 
-  const bmi = calculateBmi();
-  const bmiInfo = bmi ? getBmiCategory(parseFloat(bmi)) : null;
 
   // Admin/Provider view: Editable form
   if (canEditProfile && isEditing) {
@@ -159,7 +158,7 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
               Cancel Edit
             </Button>
           </CardTitle>
-          <CardDescription>Update the details for {patient.name}.</CardDescription>
+          <CardDescription>Update the details for {patient.name}. Physical measurements are managed on the BMI History page.</CardDescription>
         </CardHeader>
         <CardContent>
           <PatientForm
@@ -202,16 +201,16 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
           <InfoItem label="Address" value={`${patient.city ? patient.city + ', ' : ''}${patient.municipal || ''}`} />
         </div>
         <Separator />
-        <h3 className="text-lg font-medium text-primary">Physical Measurements</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <InfoItem label="Weight" value={patient.weightKg ? `${patient.weightKg} kg` : 'N/A'} />
-          <InfoItem label="Height" value={patient.heightM ? `${patient.heightM} m` : 'N/A'} />
+        <h3 className="text-lg font-medium text-primary">Latest Physical Measurements</h3>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <InfoItem label="Weight" value={lastBmiRecord ? `${lastBmiRecord.weightKg} kg` : 'N/A'} />
+          <InfoItem label="Height" value={lastBmiRecord ? `${lastBmiRecord.heightM} m` : 'N/A'} />
           <div>
             <p className="text-sm font-medium text-muted-foreground">BMI</p>
-            {bmi ? (
+            {lastBmiRecord ? (
               <div className="flex items-center space-x-2">
-                <p className="text-md font-semibold">{bmi}</p>
-                <Badge variant={bmiInfo?.variant}>{bmiInfo?.category}</Badge>
+                <p className="text-md font-semibold">{lastBmiRecord.bmi.toFixed(2)}</p>
+                {bmiInfo && <Badge variant={bmiInfo.variant}>{bmiInfo.category}</Badge>}
               </div>
             ) : (
               <p className="text-md">N/A</p>

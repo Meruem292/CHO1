@@ -115,36 +115,12 @@ export function useMockDb() {
     return { ...dataToSave, id: newId } as Patient;
   }, [user]);
 
-  const addBmiRecord = useCallback(async (bmiData: Omit<BmiRecord, 'id' | 'createdAt'>) => {
-    if (!user) throw new Error("User must be logged in to add a BMI record.");
-    const newBmiRef = push(ref(database, 'bmiRecords'));
-    const dataToSave = { ...bmiData, createdAt: serverTimestamp() };
-    await set(newBmiRef, dataToSave);
-    await createAuditLog(user, 'bmi_record_created', `Added BMI record for patient ${bmiData.patientId}`, newBmiRef.key!, 'bmiRecord');
-  }, [user]);
-
-
   const updatePatient = useCallback(async (id: string, updates: Partial<Omit<Patient, 'id'>>) => {
      if (!user) throw new Error("User must be logged in to update a patient.");
     const patientRef = ref(database, `patients/${id}`);
     await firebaseUpdate(patientRef, { ...updates, updatedAt: serverTimestamp() });
      await createAuditLog(user, 'patient_record_updated', `Updated patient record for ${updates.name || id}`, id, 'patient', { changes: updates });
-
-     // If weight and height are updated, create a BMI history record
-    if (updates.weightKg && updates.heightM) {
-      const bmi = parseFloat((updates.weightKg / (updates.heightM * updates.heightM)).toFixed(2));
-      const bmiRecord: Omit<BmiRecord, 'id' | 'createdAt'> = {
-        patientId: id,
-        date: new Date().toISOString(),
-        weightKg: updates.weightKg,
-        heightM: updates.heightM,
-        bmi: bmi,
-        recordedById: user.id,
-        recordedByName: user.name,
-      };
-      await addBmiRecord(bmiRecord);
-    }
-  }, [user, addBmiRecord]);
+  }, [user]);
 
   const archiveRecord = useCallback(async (sourcePath: string, archivePath: string, recordId: string, recordName: string, recordType: string, auditAction: AuditLogAction) => {
     if (!user) throw new Error("User must be logged in to archive a record.");
@@ -378,6 +354,15 @@ export function useMockDb() {
     });
     return unsubscribe;
   }, []);
+
+  const addBmiRecord = useCallback(async (bmiData: Omit<BmiRecord, 'id' | 'createdAt'>) => {
+    if (!user) throw new Error("User must be logged in to add a BMI record.");
+    const newBmiRef = push(ref(database, 'bmiRecords'));
+    const dataToSave = { ...bmiData, createdAt: serverTimestamp() };
+    await set(newBmiRef, dataToSave);
+    await createAuditLog(user, 'bmi_record_created', `Added BMI record for patient ${bmiData.patientId}`, newBmiRef.key!, 'bmiRecord');
+  }, [user]);
+
 
   const getDoctorScheduleById = useCallback((doctorId: string) => {
     setDoctorScheduleLoading(true);
@@ -697,5 +682,3 @@ export function useMockDb() {
     getArchivedData, restoreArchivedRecord, permanentlyDeleteRecord,
   };
 }
-
-    
