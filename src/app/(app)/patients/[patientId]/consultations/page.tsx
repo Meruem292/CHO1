@@ -222,9 +222,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        // Only doctors can edit their own entries. Admins can archive.
-        const canEdit = user?.role === 'doctor' && user.id === consultation.doctorId;
+        const canEditOwn = user?.role === 'doctor' && user.id === consultation.doctorId;
+        const canRespondToPatient = user?.role === 'doctor' && consultation.doctorName === 'Patient Entry';
+        const canEdit = canEditOwn || canRespondToPatient;
         const canArchive = user?.role === 'admin' || canEdit;
+
         if (!canArchive) return null;
 
         return (
@@ -317,7 +319,8 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
               Manage consultation records for {patientName}.
               {user?.role === 'doctor' && !editingConsultation && ` This record will be attributed to you, Dr. ${user.name}.`}
               {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId === user.id && ` You are editing your entry.`}
-              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingConsultation.doctorName || 'another doctor'}.`}
+               {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorName === "Patient Entry" && ` You are responding to an entry made by the patient.`}
+              {user?.role === 'doctor' && editingConsultation && editingConsultation.doctorId !== user.id && editingConsultation.doctorName !== "Patient Entry" && ` You are editing an entry made by Dr. ${editingConsultation.doctorName || 'another doctor'}.`}
             </DialogDescription>
           </DialogHeader>
           <ConsultationForm

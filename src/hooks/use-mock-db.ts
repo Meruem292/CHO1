@@ -198,7 +198,7 @@ export function useMockDb() {
         dataToUpdate.patientName = patientRec.name;
     }
 
-    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
+    if (user && user.role === 'doctor') { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }

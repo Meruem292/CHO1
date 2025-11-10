@@ -90,6 +90,17 @@ export function ConsultationForm({
     }
   }, [subjectType, form]);
 
+  useEffect(() => {
+    form.reset({
+      date: consultation?.date || new Date().toISOString().split('T')[0],
+      notes: consultation?.notes || '',
+      diagnosis: consultation?.diagnosis || '',
+      treatmentPlan: consultation?.treatmentPlan || '',
+      subjectType: consultation?.subjectType || 'mother',
+      babyId: consultation?.babyId || undefined,
+      babyName: consultation?.babyName || undefined,
+    });
+  }, [consultation, form]);
 
   const handleSubmit = (data: z.infer<typeof consultationSchema>) => {
     let finalData = { ...data };
