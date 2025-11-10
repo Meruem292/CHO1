@@ -127,7 +127,12 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
   }, [patient, form.reset]);
 
   const handleFormSubmit = async (data: PatientFormData) => {
-    await onSubmit(data);
+    // Convert undefined values to null for Firebase compatibility
+    const sanitizedData = Object.entries(data).reduce((acc, [key, value]) => {
+      acc[key as keyof PatientFormData] = value === undefined ? null : value;
+      return acc;
+    }, {} as PatientFormData);
+    await onSubmit(sanitizedData);
   };
 
   return (
