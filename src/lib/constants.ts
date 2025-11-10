@@ -1,7 +1,7 @@
 
 
 import type { NavItem, UserRole } from '@/types';
-import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History, ListOrdered, Archive } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History, ListOrdered, Archive, TrendingUp } from 'lucide-react';
 
 export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'midwife/nurse', 'patient'];
 

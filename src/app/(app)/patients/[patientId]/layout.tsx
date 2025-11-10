@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
@@ -11,7 +12,7 @@ import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, User, ClipboardList, Baby, HeartPulse, ShieldAlert, Loader2 } from 'lucide-react';
+import { ChevronLeft, User, ClipboardList, Baby, HeartPulse, ShieldAlert, Loader2, TrendingUp } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface ResolvedPageParams {
@@ -88,6 +89,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
 
   const getActiveTabValue = () => {
     if (pathname.endsWith('/profile')) return 'profile';
+    if (pathname.endsWith('/bmi-history')) return 'bmi-history';
     if (pathname.endsWith('/consultations')) return 'consultations';
     if (pathname.endsWith('/maternity-history')) return 'maternity-history';
     if (pathname.endsWith('/baby-health')) return 'baby-health';
@@ -140,6 +142,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
 
   const baseNavItems = [
     { value: 'profile', label: 'Patient Info', icon: User, href: `/patients/${patientId}/profile` },
+    { value: 'bmi-history', label: 'BMI History', icon: TrendingUp, href: `/patients/${patientId}/bmi-history`, roles: ['admin', 'doctor', 'midwife/nurse', 'patient'] },
     { value: 'consultations', label: 'Consultations', icon: ClipboardList, href: `/patients/${patientId}/consultations`, roles: ['admin', 'doctor', 'patient'] },
     { value: 'maternity-history', label: 'Maternity History', icon: Baby, href: `/patients/${patientId}/maternity-history` },
     { value: 'baby-health', label: 'Baby Health', icon: HeartPulse, href: `/patients/${patientId}/baby-health` },

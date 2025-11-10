@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'admin' | 'doctor' | 'midwife/nurse' | 'patient';
 
 export interface User {
@@ -93,6 +94,19 @@ export interface BabyRecord {
   updatedAt?: object;
 }
 
+// New type for BMI History
+export interface BmiRecord {
+  id: string;
+  patientId: string;
+  date: string; // ISO String for when the record was made
+  weightKg: number;
+  heightM: number;
+  bmi: number;
+  recordedById: string;
+  recordedByName: string;
+  createdAt?: object;
+}
+
 export interface NavItem {
   href: string;
   label: string;
@@ -185,6 +199,7 @@ export type AuditLogAction =
   | 'patient_record_created'
   | 'patient_record_updated'
   | 'patient_record_archived'
+  | 'bmi_record_created' // New audit action
   | 'consultation_created'
   | 'consultation_updated'
   | 'consultation_deleted' // This is now 'archive'

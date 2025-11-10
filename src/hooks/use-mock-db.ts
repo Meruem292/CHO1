@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole, DayOfWeek, AuditLogAction } from '@/types';
+import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole, DayOfWeek, AuditLogAction, BmiRecord } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
@@ -51,6 +52,10 @@ export function useMockDb() {
 
   const [babyRecords, setBabyRecords] = useState<BabyRecord[]>([]); // Shared state for general baby record viewing
   const [babyRecordsLoading, setBabyRecordsLoading] = useState(true);
+
+  // New state for BMI records
+  const [bmiHistory, setBmiHistory] = useState<BmiRecord[]>([]);
+  const [bmiHistoryLoading, setBmiHistoryLoading] = useState(true);
 
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule | null>(null);
   const [doctorScheduleLoading, setDoctorScheduleLoading] = useState(true);
@@ -110,12 +115,36 @@ export function useMockDb() {
     return { ...dataToSave, id: newId } as Patient;
   }, [user]);
 
+  const addBmiRecord = useCallback(async (bmiData: Omit<BmiRecord, 'id' | 'createdAt'>) => {
+    if (!user) throw new Error("User must be logged in to add a BMI record.");
+    const newBmiRef = push(ref(database, 'bmiRecords'));
+    const dataToSave = { ...bmiData, createdAt: serverTimestamp() };
+    await set(newBmiRef, dataToSave);
+    await createAuditLog(user, 'bmi_record_created', `Added BMI record for patient ${bmiData.patientId}`, newBmiRef.key!, 'bmiRecord');
+  }, [user]);
+
+
   const updatePatient = useCallback(async (id: string, updates: Partial<Omit<Patient, 'id'>>) => {
      if (!user) throw new Error("User must be logged in to update a patient.");
     const patientRef = ref(database, `patients/${id}`);
     await firebaseUpdate(patientRef, { ...updates, updatedAt: serverTimestamp() });
      await createAuditLog(user, 'patient_record_updated', `Updated patient record for ${updates.name || id}`, id, 'patient', { changes: updates });
-  }, [user]);
+
+     // If weight and height are updated, create a BMI history record
+    if (updates.weightKg && updates.heightM) {
+      const bmi = parseFloat((updates.weightKg / (updates.heightM * updates.heightM)).toFixed(2));
+      const bmiRecord: Omit<BmiRecord, 'id' | 'createdAt'> = {
+        patientId: id,
+        date: new Date().toISOString(),
+        weightKg: updates.weightKg,
+        heightM: updates.heightM,
+        bmi: bmi,
+        recordedById: user.id,
+        recordedByName: user.name,
+      };
+      await addBmiRecord(bmiRecord);
+    }
+  }, [user, addBmiRecord]);
 
   const archiveRecord = useCallback(async (sourcePath: string, archivePath: string, recordId: string, recordName: string, recordType: string, auditAction: AuditLogAction) => {
     if (!user) throw new Error("User must be logged in to archive a record.");
@@ -157,7 +186,7 @@ export function useMockDb() {
     const patientRec = patients.find(p => p.id === consultationData.patientId);
     
     // Add default values for fields that might be missing from a patient-submitted form
-    const dataToSave: Omit<ConsultationRecord, 'id'> & { doctorId?: string; doctorName?: string; patientName?: string; } = {
+    const dataToSave: Partial<Omit<ConsultationRecord, 'id'>> & { patientName?: string; createdAt: object; doctorId?: string; doctorName?: string; } = {
          notes: '', // default empty notes
          ...consultationData,
          patientName: patientRec?.name || 'Unknown Patient',
@@ -171,26 +200,20 @@ export function useMockDb() {
         // doctorName is already set to "Patient Entry" in the component
     }
 
-    // Remove undefined keys before sending to Firebase
-    Object.keys(dataToSave).forEach(key => {
-        const K = key as keyof typeof dataToSave;
-        if (dataToSave[K] === undefined) {
-            delete dataToSave[K];
-        }
-    });
+    const cleanedData = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
 
     const newId = newRef.key!;
-    await set(newRef, dataToSave);
+    await set(newRef, cleanedData);
     const actionBy = dataToSave.doctorName === "Patient Entry" ? "Patient" : dataToSave.doctorName;
     await createAuditLog(user, 'consultation_created', `Added consultation for ${dataToSave.patientName} (Entry by: ${actionBy})`, newId, 'consultation');
-    return { ...dataToSave, id: newId } as ConsultationRecord;
+    return { ...cleanedData, id: newId } as ConsultationRecord;
 }, [user, patients]);
 
 
   const updateConsultation = useCallback(async (id: string, updates: Partial<Omit<ConsultationRecord, 'id'>>) => {
     if (!user) throw new Error("User must be logged in to update a consultation.");
     const patientRec = updates.patientId ? patients.find(p => p.id === updates.patientId) : null;
-    const dataToUpdate: Partial<Omit<ConsultationRecord, 'id'>> & { doctorId?: string; doctorName?: string; patientName?: string; updatedAt: object } = {
+    const dataToUpdate: Partial<Omit<ConsultationRecord, 'id'>> & { doctorId?: string; doctorName?: string; patientName?: string; updatedAt?: object } = {
         ...updates,
         updatedAt: serverTimestamp()
     };
@@ -203,16 +226,10 @@ export function useMockDb() {
         dataToUpdate.doctorName = user.name;
     }
     
-    // Remove undefined keys before sending to Firebase
-    Object.keys(dataToUpdate).forEach(key => {
-        const K = key as keyof typeof dataToUpdate;
-        if (dataToUpdate[K] === undefined) {
-            delete dataToUpdate[K];
-        }
-    });
+    const cleanedData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined));
 
-    await firebaseUpdate(ref(database, `consultations/${id}`), dataToUpdate);
-    await createAuditLog(user, 'consultation_updated', `Updated consultation for ${dataToUpdate.patientName || id}`, id, 'consultation', { changes: updates });
+    await firebaseUpdate(ref(database, `consultations/${id}`), cleanedData);
+    await createAuditLog(user, 'consultation_updated', `Updated consultation for ${cleanedData.patientName || id}`, id, 'consultation', { changes: cleanedData });
   }, [user, patients]);
 
   const deleteConsultation = useCallback(async (id: string) => {
@@ -345,6 +362,22 @@ export function useMockDb() {
     const record = babyRecords.find(b => b.id === id);
     await archiveRecord('babyRecords', 'archivedData/babyRecords', id, record?.name || id, 'baby record', 'baby_record_deleted');
   }, [archiveRecord, babyRecords]);
+
+  // BMI History
+  const getBmiHistoryByPatientId = useCallback((patientId: string) => {
+    setBmiHistoryLoading(true);
+    const bmiQuery = query(ref(database, 'bmiRecords'), orderByChild('patientId'), equalTo(patientId));
+    const unsubscribe = onValue(bmiQuery, (snapshot) => {
+        const records = snapshotToArray<BmiRecord>(snapshot);
+        setBmiHistory(records.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        setBmiHistoryLoading(false);
+    }, (error) => {
+        console.error(`Error fetching BMI history for patient ${patientId}:`, error);
+        setBmiHistory([]);
+        setBmiHistoryLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   const getDoctorScheduleById = useCallback((doctorId: string) => {
     setDoctorScheduleLoading(true);
@@ -646,6 +679,7 @@ export function useMockDb() {
     consultations, consultationsLoading, getConsultationsByPatientId, addConsultation, updateConsultation, deleteConsultation,
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId, addMaternityRecord, updateMaternityRecord, deleteMaternityRecord,
     babyRecords, babyRecordsLoading, getBabyRecordsByMotherId, fetchBabyRecordsForMotherOnce, addBabyRecord, updateBabyRecord, deleteBabyRecord,
+    bmiHistory, bmiHistoryLoading, getBmiHistoryByPatientId, addBmiRecord,
     doctorSchedule, doctorScheduleLoading, getDoctorScheduleById, saveDoctorSchedule,
     allDoctorSchedules, allDoctorSchedulesLoading, getAllDoctorSchedules,
     appointments, appointmentsLoading, getAppointmentsByPatientId, getAppointmentsByDoctorId, updateAppointmentStatus,
