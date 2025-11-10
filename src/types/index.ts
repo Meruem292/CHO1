@@ -16,7 +16,7 @@ export interface PatientFormData {
   dateOfBirth?: string;
   email: string;
   phoneNumber?: string;
-  municipality?: string;
+  city?: string;
   province?: string;
   sex?: 'male' | 'female' | 'other';
   civilStatus?: string;

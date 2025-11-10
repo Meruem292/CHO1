@@ -59,7 +59,7 @@ const formStructure = [
     fields: [
       { name: 'phoneNumber', label: 'Phone Number (Optional)', placeholder: '09xxxxxxxxx' },
       { name: 'email', label: 'Email Address', placeholder: 'juan@example.com' },
-      { name: 'municipality', label: 'Municipality', placeholder: 'Dasmariñas' },
+      { name: 'city', label: 'City', placeholder: 'Dasmariñas' },
       { name: 'province', label: 'Province', placeholder: 'Cavite' },
     ]
   },
@@ -72,7 +72,7 @@ const formStructure = [
     ]
   },
   {
-    sectionTitle: "Health Information",
+    sectionTitle: "Health & Membership",
     fields: [
       { name: 'philhealthMember', label: 'PhilHealth Member? (Optional)', type: 'select', options: [{value: 'yes', label: 'Yes'}, {value: 'no', label: 'No'}], placeholder: 'Select status' },
       { name: 'philhealthNumber', label: 'PhilHealth Number (Optional)', placeholder: 'Enter PhilHealth No.' },
@@ -97,7 +97,7 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
     dateOfBirth: patient?.dateOfBirth || '',
     email: patient?.email || '',
     phoneNumber: patient?.phoneNumber || '',
-    municipality: 'Dasmariñas',
+    city: 'Dasmariñas',
     province: 'Cavite',
     sex: patient?.sex || undefined,
     civilStatus: patient?.civilStatus || '',
@@ -221,7 +221,7 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
                                 placeholder={fieldConfig.placeholder}
                                 {...field}
                                 value={field.value ?? ''} // Handle null/undefined for input value
-                                disabled={isLoading || fieldConfig.name === 'municipality' || fieldConfig.name === 'province'}
+                                disabled={isLoading || fieldConfig.name === 'city' || fieldConfig.name === 'province'}
                               />
                           </FormControl>
                         )}
