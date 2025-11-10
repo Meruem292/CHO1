@@ -69,6 +69,7 @@ export function ConsultationForm({
   const [isLoadingBabies, setIsLoadingBabies] = useState(false);
 
   const subjectType = form.watch('subjectType');
+  const isRespondingToPatient = consultation?.doctorName === 'Patient Entry';
 
   useEffect(() => {
     if (showSubjectSelection && subjectType === 'baby' && motherId) {
@@ -140,6 +141,7 @@ export function ConsultationForm({
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     className="flex flex-col space-y-1"
+                    disabled={isRespondingToPatient}
                   >
                     <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl>
@@ -172,9 +174,9 @@ export function ConsultationForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Select Baby</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingBabies || isRespondingToPatient}>
                   <FormControl>
-                    <SelectTrigger disabled={isLoadingBabies}>
+                    <SelectTrigger>
                       {isLoadingBabies ? (
                         <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading babies...</span>
                       ) : (
@@ -214,6 +216,7 @@ export function ConsultationForm({
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
+                      disabled={isRespondingToPatient}
                     >
                       {field.value ? (
                         formatInPHTime_PPP(field.value)
@@ -243,9 +246,14 @@ export function ConsultationForm({
           name="notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Notes</FormLabel>
+              <FormLabel>{isRespondingToPatient ? "Concern of the Patient" : "Notes"}</FormLabel>
               <FormControl>
-                <Textarea placeholder="Enter consultation notes" {...field} rows={4}/>
+                <Textarea 
+                    placeholder={isRespondingToPatient ? "" : "Enter consultation notes"} 
+                    {...field} 
+                    rows={4}
+                    disabled={isRespondingToPatient}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -256,7 +264,7 @@ export function ConsultationForm({
           name="diagnosis"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Diagnosis (Optional)</FormLabel>
+              <FormLabel>Diagnosis</FormLabel>
               <FormControl>
                 <Input placeholder="Enter diagnosis" {...field} />
               </FormControl>
@@ -269,7 +277,7 @@ export function ConsultationForm({
           name="treatmentPlan"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Treatment Plan (Optional)</FormLabel>
+              <FormLabel>Treatment Plan</FormLabel>
               <FormControl>
                 <Textarea placeholder="Enter treatment plan" {...field} rows={3}/>
               </FormControl>
@@ -292,3 +300,4 @@ export function ConsultationForm({
     </Form>
   );
 }
+
