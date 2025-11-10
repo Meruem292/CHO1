@@ -32,6 +32,15 @@ export const createAuditLog = async (
     details,
   };
 
+  // Remove undefined properties before sending to Firebase
+  Object.keys(logEntry).forEach(key => {
+    const K = key as keyof typeof logEntry;
+    if (logEntry[K] === undefined) {
+      delete logEntry[K];
+    }
+  });
+
+
   try {
     const logRef = push(ref(database, 'auditLogs'));
     await set(logRef, logEntry);
