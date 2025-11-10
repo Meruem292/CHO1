@@ -3,13 +3,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Patient, UserRole } from '@/types';
-import { adminCreateUserSchema, type AdminCreateUserFormData } from '@/zod-schemas'; // Import AdminCreateUserFormData
+import { adminCreateUserSchema, type AdminCreateUserFormData } from '@/zod-schemas'; 
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, UserCog, Loader2, ShieldAlert, Stethoscope } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, UserCog, Loader2, ShieldAlert, Stethoscope, Archive } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,26 +34,24 @@ import { UserFormDialog } from '@/components/dialogs/user-form-dialog';
 import { EditUserRoleDialog } from '@/components/dialogs/edit-user-role-dialog';
 
 export default function ProvidersPage() {
-  const { user, adminCreateUserWithEmail } = useAuth(); // Get adminCreateUserWithEmail
+  const { user, adminCreateUserWithEmail } = useAuth(); 
   const { 
     patients: allUsers, 
     patientsLoading: usersLoading, 
-    // addPatient is no longer directly used for user creation.
     updatePatient: updateUser,
-    deletePatient: deleteUser 
+    deletePatient: archiveUser 
   } = useMockDb();
   
   const [isAddUserFormOpen, setIsAddUserFormOpen] = useState(false);
   const [isEditRoleFormOpen, setIsEditRoleFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Patient | undefined>(undefined);
-  const [userToDelete, setUserToDelete] = useState<Patient | null>(null);
+  const [userToArchive, setUserToArchive] = useState<Patient | null>(null);
 
   const providerUsers = useMemo(() => {
     return allUsers.filter(u => u.role === 'doctor' || u.role === 'midwife/nurse');
   }, [allUsers]);
 
   const handleAddUserSubmit = async (data: AdminCreateUserFormData) => {
-    // Check if email already exists in the database
     const emailExists = allUsers.some(u => u.email === data.email);
     if (emailExists) {
       toast({
@@ -61,18 +59,17 @@ export default function ProvidersPage() {
         title: "Email Already Exists",
         description: "A user with this email address is already registered in the database.",
       });
-      return; // Stop the submission
+      return; 
     }
 
     try {
-      // Call adminCreateUserWithEmail, which handles Auth and DB record creation
       await adminCreateUserWithEmail(
         data.email, 
         data.password, 
         data.firstName, 
         data.middleName, 
         data.lastName, 
-        data.role // role from form
+        data.role 
       );
       setIsAddUserFormOpen(false);
     } catch (error) {
@@ -100,20 +97,20 @@ export default function ProvidersPage() {
     setIsEditRoleFormOpen(true);
   };
 
-  const handleDeleteUserConfirm = async () => {
-    if (userToDelete) {
+  const handleArchiveUserConfirm = async () => {
+    if (userToArchive) {
       try {
-        if (userToDelete.role === 'admin') {
-            toast({ variant: "destructive", title: "Action Not Allowed", description: "Admin users cannot be deleted from this interface." });
-            setUserToDelete(null);
+        if (userToArchive.role === 'admin') {
+            toast({ variant: "destructive", title: "Action Not Allowed", description: "Admin users cannot be archived from this interface." });
+            setUserToArchive(null);
             return;
         }
-        await deleteUser(userToDelete.id);
-        toast({ title: "User Deleted", description: `${userToDelete.name} has been removed from the system.` });
-        setUserToDelete(null);
+        await archiveUser(userToArchive.id);
+        toast({ title: "User Archived", description: `${userToArchive.name} has been archived.` });
+        setUserToArchive(null);
       } catch (error) {
-        console.error("Error deleting user:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
+        console.error("Error archiving user:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to archive user." });
       }
     }
   };
@@ -170,8 +167,8 @@ export default function ProvidersPage() {
                 <Edit className="mr-2 h-4 w-4" /> Edit Role
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setUserToDelete(targetUser)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete Provider
+              <DropdownMenuItem onClick={() => setUserToArchive(targetUser)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                <Archive className="mr-2 h-4 w-4" /> Archive Provider
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -248,21 +245,20 @@ export default function ProvidersPage() {
         />
       )}
       
-      {userToDelete && (
-        <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+      {userToArchive && (
+        <AlertDialog open={!!userToArchive} onOpenChange={() => setUserToArchive(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will remove "{userToDelete.name}" ({userToDelete.role}) 
-                from the application's database. Their Firebase Authentication record might remain. 
-                Associated records (consultations, etc.) will also be deleted.
+                This action cannot be undone. This will archive the provider "{userToArchive.name}" ({userToArchive.role}) from the application's database. 
+                You can restore them later from the Archive page.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteUserConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                Delete User
+              <AlertDialogCancel onClick={() => setUserToArchive(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleArchiveUserConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                Archive User
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -72,6 +72,16 @@ export function useMockDb() {
   const [doctorActivityBaby, setDoctorActivityBaby] = useState<BabyRecord[]>([]);
   const [doctorActivityLoading, setDoctorActivityLoading] = useState(true);
 
+  // New state for archived data
+  const [archivedPatients, setArchivedPatients] = useState<Patient[]>([]);
+  const [archivedPatientsLoading, setArchivedPatientsLoading] = useState(true);
+  const [archivedConsultations, setArchivedConsultations] = useState<ConsultationRecord[]>([]);
+  const [archivedConsultationsLoading, setArchivedConsultationsLoading] = useState(true);
+  const [archivedMaternityRecords, setArchivedMaternityRecords] = useState<MaternityRecord[]>([]);
+  const [archivedMaternityRecordsLoading, setArchivedMaternityRecordsLoading] = useState(true);
+  const [archivedBabyRecords, setArchivedBabyRecords] = useState<BabyRecord[]>([]);
+  const [archivedBabyRecordsLoading, setArchivedBabyRecordsLoading] = useState(true);
+
 
   useEffect(() => {
     const patientsRef = ref(database, 'patients');
@@ -101,37 +111,24 @@ export function useMockDb() {
     await firebaseUpdate(patientRef, { ...updates, updatedAt: serverTimestamp() });
   }, []);
 
-  const deletePatient = useCallback(async (id: string) => {
-    await firebaseRemove(ref(database, `patients/${id}`));
-    const consultsQuery = query(ref(database, 'consultations'), orderByChild('patientId'), equalTo(id));
-    onValue(consultsQuery, (snapshot) => {
-        snapshot.forEach((childSnapshot) => {
-            firebaseRemove(childSnapshot.ref);
-        });
-    }, { onlyOnce: true });
-     const maternityQuery = query(ref(database, 'maternityRecords'), orderByChild('patientId'), equalTo(id));
-    onValue(maternityQuery, (snapshot) => {
-        snapshot.forEach((childSnapshot) => {
-            firebaseRemove(childSnapshot.ref);
-        });
-    }, { onlyOnce: true });
-    const babyQuery = query(ref(database, 'babyRecords'), orderByChild('motherId'), equalTo(id));
-    onValue(babyQuery, (snapshot) => {
-        snapshot.forEach((childSnapshot) => {
-            firebaseRemove(childSnapshot.ref);
-        });
-    }, { onlyOnce: true });
-    const appointmentsAsPatientQuery = query(ref(database, 'appointments'), orderByChild('patientId'), equalTo(id));
-    onValue(appointmentsAsPatientQuery, (snapshot) => {
-      snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
-    }, { onlyOnce: true });
-     const appointmentsAsDoctorQuery = query(ref(database, 'appointments'), orderByChild('doctorId'), equalTo(id));
-    onValue(appointmentsAsDoctorQuery, (snapshot) => {
-      snapshot.forEach((childSnapshot) => firebaseRemove(childSnapshot.ref));
-    }, { onlyOnce: true });
-    const doctorScheduleRef = ref(database, `doctorSchedules/${id}`);
-    firebaseRemove(doctorScheduleRef);
+  const archiveRecord = useCallback(async (sourcePath: string, archivePath: string, recordId: string) => {
+    const sourceRef = ref(database, `${sourcePath}/${recordId}`);
+    const snapshot = await get(sourceRef);
+    if (snapshot.exists()) {
+        const recordData = snapshot.val();
+        const archiveRef = ref(database, `${archivePath}/${recordId}`);
+        await set(archiveRef, { ...recordData, archivedAt: serverTimestamp() });
+        await firebaseRemove(sourceRef);
+    } else {
+        throw new Error(`Record not found at ${sourcePath}/${recordId} to archive.`);
+    }
   }, []);
+
+  const deletePatient = useCallback(async (id: string) => {
+    await archiveRecord('patients', 'archivedData/patients', id);
+    // Note: We are not archiving related data in this implementation for simplicity.
+    // In a production app, you'd want to handle related data (consultations, appointments, etc.)
+  }, [archiveRecord]);
 
   const getConsultationsByPatientId = useCallback((patientId: string) => {
     setConsultationsLoading(true);
@@ -184,8 +181,8 @@ export function useMockDb() {
   }, [user, patients]);
 
   const deleteConsultation = useCallback(async (id: string) => {
-    await firebaseRemove(ref(database, `consultations/${id}`));
-  }, []);
+    await archiveRecord('consultations', 'archivedData/consultations', id);
+  }, [archiveRecord]);
 
   const getMaternityHistoryByPatientId = useCallback((patientId: string) => {
     setMaternityRecordsLoading(true);
@@ -234,8 +231,8 @@ export function useMockDb() {
   }, [user, patients]);
 
   const deleteMaternityRecord = useCallback(async (id: string) => {
-    await firebaseRemove(ref(database, `maternityRecords/${id}`));
-  }, []);
+    await archiveRecord('maternityRecords', 'archivedData/maternityRecords', id);
+  }, [archiveRecord]);
 
   const getBabyRecordsByMotherId = useCallback((motherId: string) => {
     setBabyRecordsLoading(true);
@@ -298,8 +295,8 @@ export function useMockDb() {
   }, [user, patients]);
 
   const deleteBabyRecord = useCallback(async (id: string) => {
-    await firebaseRemove(ref(database, `babyRecords/${id}`));
-  }, []);
+    await archiveRecord('babyRecords', 'archivedData/babyRecords', id);
+  }, [archiveRecord]);
 
   const getDoctorScheduleById = useCallback((doctorId: string) => {
     setDoctorScheduleLoading(true);
@@ -519,6 +516,60 @@ export function useMockDb() {
     return unsubscribe;
   }, [patients]);
 
+  // Archive-related functions
+  const getArchivedData = useCallback((dataType: 'patients' | 'consultations' | 'maternityRecords' | 'babyRecords') => {
+    const setLoading = {
+      patients: setArchivedPatientsLoading,
+      consultations: setArchivedConsultationsLoading,
+      maternityRecords: setArchivedMaternityRecordsLoading,
+      babyRecords: setArchivedBabyRecordsLoading,
+    }[dataType];
+    const setData = {
+      patients: setArchivedPatients,
+      consultations: setArchivedConsultations,
+      maternityRecords: setArchivedMaternityRecords,
+      babyRecords: setArchivedBabyRecords,
+    }[dataType];
+
+    setLoading(true);
+    const archiveRef = ref(database, `archivedData/${dataType}`);
+    const unsubscribe = onValue(archiveRef, (snapshot) => {
+      setData(snapshotToArray(snapshot));
+      setLoading(false);
+    }, (error) => {
+      console.error(`Error fetching archived ${dataType}:`, error);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const restoreArchivedRecord = useCallback(async (dataType: 'patients' | 'consultations' | 'maternityRecords' | 'babyRecords', recordId: string) => {
+    const archiveRef = ref(database, `archivedData/${dataType}/${recordId}`);
+    const snapshot = await get(archiveRef);
+    if (snapshot.exists()) {
+      let recordData = snapshot.val();
+      delete recordData.archivedAt; // Remove archive timestamp
+      
+      const destinationPath = {
+        patients: 'patients',
+        consultations: 'consultations',
+        maternityRecords: 'maternityRecords',
+        babyRecords: 'babyRecords',
+      }[dataType];
+      
+      const destinationRef = ref(database, `${destinationPath}/${recordId}`);
+      await set(destinationRef, recordData);
+      await firebaseRemove(archiveRef);
+    } else {
+      throw new Error(`Archived record not found to restore.`);
+    }
+  }, []);
+
+  const permanentlyDeleteRecord = useCallback(async (dataType: 'patients' | 'consultations' | 'maternityRecords' | 'babyRecords', recordId: string) => {
+    const archiveRef = ref(database, `archivedData/${dataType}/${recordId}`);
+    await firebaseRemove(archiveRef);
+  }, []);
+
 
   return {
     patients, patientsLoading, getPatients, getPatientById, addPatient, updatePatient, deletePatient,
@@ -534,5 +585,11 @@ export function useMockDb() {
     // Doctor Activity Log
     doctorActivityConsultations, doctorActivityMaternity, doctorActivityBaby, doctorActivityLoading,
     getConsultationsByDoctor, getMaternityRecordsByDoctor, getBabyRecordsByDoctor,
+    // Archive
+    archivedPatients, archivedPatientsLoading,
+    archivedConsultations, archivedConsultationsLoading,
+    archivedMaternityRecords, archivedMaternityRecordsLoading,
+    archivedBabyRecords, archivedBabyRecordsLoading,
+    getArchivedData, restoreArchivedRecord, permanentlyDeleteRecord,
   };
 }

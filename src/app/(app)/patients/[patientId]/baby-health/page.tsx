@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, HeartPulse, AlertTriangle, UserMdIcon } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, HeartPulse, AlertTriangle, UserMdIcon, Archive } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,7 +78,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
   const [motherName, setMotherName] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<BabyRecord | undefined>(undefined);
-  const [recordToDelete, setRecordToDelete] = useState<BabyRecord | null>(null);
+  const [recordToArchive, setRecordToArchive] = useState<BabyRecord | null>(null);
 
   useEffect(() => {
     const motherRecordRef = dbRef(database, `patients/${motherId}/name`);
@@ -126,15 +126,15 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (recordToDelete) {
+  const handleArchiveConfirm = async () => {
+    if (recordToArchive) {
       try {
-        await deleteBabyRecord(recordToDelete.id);
-        toast({ title: "Baby Record Deleted", description: `Record for ${recordToDelete.name || 'baby'} deleted.` });
-        setRecordToDelete(null);
+        await deleteBabyRecord(recordToArchive.id);
+        toast({ title: "Baby Record Archived", description: `Record for ${recordToArchive.name || 'baby'} archived.` });
+        setRecordToArchive(null);
       } catch (error) {
-        console.error("Error deleting baby health record:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete baby health record." });
+        console.error("Error archiving baby health record:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to archive baby health record." });
       }
     }
   };
@@ -203,8 +203,8 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
                 <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setRecordToDelete(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <DropdownMenuItem onClick={() => setRecordToArchive(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                <Archive className="mr-2 h-4 w-4" /> Archive
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -266,18 +266,18 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
         </DialogContent>
       </Dialog>
 
-      {recordToDelete && (
-        <AlertDialog open={!!recordToDelete} onOpenChange={() => setRecordToDelete(null)}>
+      {recordToArchive && (
+        <AlertDialog open={!!recordToArchive} onOpenChange={() => setRecordToArchive(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the baby health record for {recordToDelete.name || 'this baby'}.
+                This action cannot be undone. This will archive the baby health record for {recordToArchive.name || 'this baby'}. You can restore it later from the archive page.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogCancel onClick={() => setRecordToArchive(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleArchiveConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Archive</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

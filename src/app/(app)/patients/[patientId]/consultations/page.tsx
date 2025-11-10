@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope } from 'lucide-react'; // Removed ShieldAlert, ChevronLeft
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope, Archive } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ConsultationForm } from '@/components/forms/consultation-form';
 import { toast } from '@/hooks/use-toast';
-// import Link from 'next/link'; // Link is handled by the layout
 import { parseISO } from 'date-fns';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -65,7 +64,7 @@ interface ConsultationsPageProps {
 
 export default function PatientConsultationsPage({ params: paramsPromise }: ConsultationsPageProps) {
   const actualParams = use(paramsPromise);
-  const { patientId } = actualParams; // Access control is now in the layout
+  const { patientId } = actualParams; 
 
   const { user } = useAuth();
   const {
@@ -77,13 +76,12 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     deleteConsultation
   } = useMockDb();
   
-  const [patientName, setPatientName] = useState<string>(''); // Only need name for descriptions
+  const [patientName, setPatientName] = useState<string>(''); 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
-  const [consultationToDelete, setConsultationToDelete] = useState<ConsultationRecord | null>(null);
+  const [consultationToArchive, setConsultationToArchive] = useState<ConsultationRecord | null>(null);
   
   useEffect(() => {
-    // Fetch patient name for descriptions if needed, or rely on layout's patient object
     const patientRecordRef = dbRef(database, `patients/${patientId}/name`);
     const unsubName = onValue(patientRecordRef, (snapshot) => {
         setPatientName(snapshot.val() || 'Patient');
@@ -115,8 +113,6 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     
     try {
       if (editingConsultation) {
-        // When editing, we pass the fullConsultationData which might include updated doctor info if a doctor edits.
-        // If an admin edits, doctorId/doctorName from original record are preserved unless explicitly changed in 'data'.
         await updateConsultation(editingConsultation.id, fullConsultationData);
         toast({ title: "Consultation Updated", description: `Record for ${formatInPHTime_PPP(data.date)} updated.` });
       } else {
@@ -136,20 +132,20 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     setIsFormOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (consultationToDelete) {
+  const handleArchiveConfirm = async () => {
+    if (consultationToArchive) {
       if (user?.role !== 'doctor' && user?.role !== 'admin') {
-         toast({ variant: 'destructive', title: 'Permission Denied', description: 'Only doctors or admins can delete consultations.' });
-         setConsultationToDelete(null);
+         toast({ variant: 'destructive', title: 'Permission Denied', description: 'Only doctors or admins can archive consultations.' });
+         setConsultationToArchive(null);
         return;
       }
       try {
-        await deleteConsultation(consultationToDelete.id);
-        toast({ title: "Consultation Deleted", description: `Record from ${consultationToDelete.date ? formatInPHTime_PPP(consultationToDelete.date) : 'this record'} deleted.` });
-        setConsultationToDelete(null);
+        await deleteConsultation(consultationToArchive.id);
+        toast({ title: "Consultation Archived", description: `Record from ${consultationToArchive.date ? formatInPHTime_PPP(consultationToArchive.date) : 'this record'} archived.` });
+        setConsultationToArchive(null);
       } catch (error) {
-        console.error("Error deleting consultation:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete consultation." });
+        console.error("Error archiving consultation:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to archive consultation." });
       }
     }
   };
@@ -195,10 +191,8 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        // Only allow editing/deleting if user is admin or the doctor who created the record
         const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === consultation.doctorId);
-        if (!canEdit) return null; // Patients & Midwives see read-only, no actions
-
+        if (!canEdit) return null; 
 
         return (
           <DropdownMenu>
@@ -214,15 +208,15 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
                 <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setConsultationToDelete(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={user?.role !== 'doctor' && user?.role !== 'admin'}>
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={user?.role !== 'doctor' && user?.role !== 'admin'}>
+                <Archive className="mr-2 h-4 w-4" /> Archive
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
     },
-  ], [user?.role, user?.id, openEditForm, setConsultationToDelete]);
+  ], [user?.role, user?.id, openEditForm, setConsultationToArchive]);
 
 
   if (user?.role === 'midwife/nurse') {
@@ -291,18 +285,18 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         </DialogContent>
       </Dialog>
 
-       {consultationToDelete && (
-        <AlertDialog open={!!consultationToDelete} onOpenChange={() => setConsultationToDelete(null)}>
+       {consultationToArchive && (
+        <AlertDialog open={!!consultationToArchive} onOpenChange={() => setConsultationToArchive(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the consultation record from {consultationToDelete.date ? formatInPHTime_PPP(consultationToDelete.date) : 'this record'}.
+                This action cannot be undone. This will archive the consultation record from {consultationToArchive.date ? formatInPHTime_PPP(consultationToArchive.date) : 'this record'}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setConsultationToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogCancel onClick={() => setConsultationToArchive(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleArchiveConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Archive</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

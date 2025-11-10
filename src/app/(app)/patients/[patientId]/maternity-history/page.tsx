@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle, UserMdIcon, HeartPulse } from 'lucide-react'; 
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, Baby, AlertTriangle, UserMdIcon, HeartPulse, Archive } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,9 +36,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MaternityHistoryForm } from '@/components/forms/maternity-history-form';
-import { BabyHealthForm } from '@/components/forms/baby-health-form'; // Import BabyHealthForm
-import type { babyHealthSchema as babyHealthFormSchemaType } from '@/zod-schemas'; // For BabyHealthForm submit type
-import type * as z from 'zod'; // For BabyHealthForm submit type
+import { BabyHealthForm } from '@/components/forms/baby-health-form'; 
+import type { babyHealthSchema as babyHealthFormSchemaType } from '@/zod-schemas'; 
+import type * as z from 'zod'; 
 import { toast } from '@/hooks/use-toast';
 import { database } from '@/lib/firebase-config';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -76,15 +76,14 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     addMaternityRecord, 
     updateMaternityRecord, 
     deleteMaternityRecord,
-    addBabyRecord // For registering a new baby
+    addBabyRecord 
   } = useMockDb();
 
   const [patientName, setPatientName] = useState<string>('');
   const [isMaternityFormOpen, setIsMaternityFormOpen] = useState(false);
   const [editingMaternityRecord, setEditingMaternityRecord] = useState<MaternityRecord | undefined>(undefined);
-  const [maternityRecordToDelete, setMaternityRecordToDelete] = useState<MaternityRecord | null>(null);
+  const [maternityRecordToArchive, setMaternityRecordToArchive] = useState<MaternityRecord | null>(null);
 
-  // State for Baby Registration Dialog
   const [isRegisterBabyFormOpen, setIsRegisterBabyFormOpen] = useState(false);
 
 
@@ -134,21 +133,21 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     setIsMaternityFormOpen(true);
   };
 
-  const handleDeleteMaternityConfirm = async () => {
-    if (maternityRecordToDelete) {
+  const handleArchiveMaternityConfirm = async () => {
+    if (maternityRecordToArchive) {
       try {
-        await deleteMaternityRecord(maternityRecordToDelete.id);
-        toast({ title: "Maternity Record Deleted", description: `Pregnancy #${maternityRecordToDelete.pregnancyNumber} record deleted.` });
-        setMaternityRecordToDelete(null);
+        await deleteMaternityRecord(maternityRecordToArchive.id);
+        toast({ title: "Maternity Record Archived", description: `Pregnancy #${maternityRecordToArchive.pregnancyNumber} record archived.` });
+        setMaternityRecordToArchive(null);
       } catch (error) {
-        console.error("Error deleting maternity record:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete maternity record." });
+        console.error("Error archiving maternity record:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to archive maternity record." });
       }
     }
   };
 
   const handleRegisterBabySubmit = async (babyData: Omit<z.infer<typeof babyHealthFormSchemaType>, 'id' | 'motherId'>) => {
-    const recordBaseData = { ...babyData, motherId: patientId }; // motherId is the current patientId
+    const recordBaseData = { ...babyData, motherId: patientId }; 
     let fullRecordData: Omit<BabyRecord, 'id'> = { ...recordBaseData };
 
     if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
@@ -227,15 +226,15 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
                 <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setMaternityRecordToDelete(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <DropdownMenuItem onClick={() => setMaternityRecordToArchive(record)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                <Archive className="mr-2 h-4 w-4" /> Archive
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
     },
-  ], [user?.role, user?.id, openEditMaternityForm, setMaternityRecordToDelete]);
+  ], [user?.role, user?.id, openEditMaternityForm, setMaternityRecordToArchive]);
 
   return (
     <div className="space-y-6 mt-6">
@@ -297,24 +296,23 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
         </DialogContent>
       </Dialog>
 
-      {maternityRecordToDelete && (
-        <AlertDialog open={!!maternityRecordToDelete} onOpenChange={() => setMaternityRecordToDelete(null)}>
+      {maternityRecordToArchive && (
+        <AlertDialog open={!!maternityRecordToArchive} onOpenChange={() => setMaternityRecordToArchive(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the maternity record for Pregnancy #{maternityRecordToDelete.pregnancyNumber}.
+                This action cannot be undone. This will archive the maternity record for Pregnancy #{maternityRecordToArchive.pregnancyNumber}. You can restore it later from the archive page.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setMaternityRecordToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteMaternityConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogCancel onClick={() => setMaternityRecordToArchive(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleArchiveMaternityConfirm} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Archive</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
 
-      {/* Dialog for Registering a Baby */}
       <Dialog open={isRegisterBabyFormOpen} onOpenChange={setIsRegisterBabyFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -325,7 +323,6 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             </DialogDescription>
           </DialogHeader>
           <BabyHealthForm
-            // record prop is undefined for new baby
             onSubmit={handleRegisterBabySubmit}
             onCancel={() => setIsRegisterBabyFormOpen(false)}
           />
