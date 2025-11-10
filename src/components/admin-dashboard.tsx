@@ -229,3 +229,5 @@ function NoDataAlert({ type }: {type: string}) {
         </div>
     );
 }
+
+    
