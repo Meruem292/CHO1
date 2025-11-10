@@ -7,7 +7,7 @@ import { adminCreateUserSchema, type AdminCreateUserFormData } from '@/zod-schem
 import { useMockDb } from '@/hooks/use-mock-db';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, UserCog, Loader2, ShieldAlert, Archive } from 'lucide-react';
 import {
@@ -265,3 +265,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+    
