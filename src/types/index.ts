@@ -173,3 +173,40 @@ export interface AdminBootstrapConfig {
 export interface AppointmentBookingFormData {
   reasonForVisit?: string;
 }
+
+// Audit Log Types
+export type AuditLogAction =
+  | 'user_created'
+  | 'user_role_changed'
+  | 'user_deleted'
+  | 'user_login'
+  | 'user_logout'
+  | 'patient_record_created'
+  | 'patient_record_updated'
+  | 'patient_record_archived'
+  | 'consultation_created'
+  | 'consultation_updated'
+  | 'consultation_deleted'
+  | 'maternity_record_created'
+  | 'maternity_record_updated'
+  | 'maternity_record_deleted'
+  | 'baby_record_created'
+  | 'baby_record_updated'
+  | 'baby_record_deleted'
+  | 'appointment_booked'
+  | 'appointment_cancelled'
+  | 'appointment_completed'
+  | 'schedule_updated';
+
+export interface AuditLog {
+  id: string;
+  timestamp: object; // serverTimestamp
+  userId: string; // Who performed the action
+  userName: string;
+  userRole: UserRole;
+  action: AuditLogAction;
+  targetId?: string; // e.g., patientId, appointmentId
+  targetType?: string; // e.g., 'patient', 'appointment'
+  description: string; // Human-readable description of the action
+  details?: Record<string, any>; // For storing before/after states or other metadata
+}
