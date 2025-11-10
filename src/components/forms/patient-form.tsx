@@ -59,8 +59,8 @@ const formStructure = [
     fields: [
       { name: 'phoneNumber', label: 'Phone Number (Optional)', placeholder: '09xxxxxxxxx' },
       { name: 'email', label: 'Email Address', placeholder: 'juan@example.com' },
-      { name: 'municipal', label: 'Municipal (Optional)', placeholder: 'e.g., Alaminos' },
-      { name: 'city', label: 'City (Optional)', placeholder: 'e.g., San Pablo' },
+      { name: 'municipality', label: 'Municipality', placeholder: 'Dasmariñas' },
+      { name: 'province', label: 'Province', placeholder: 'Cavite' },
     ]
   },
   {
@@ -97,8 +97,8 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
     dateOfBirth: patient?.dateOfBirth || '',
     email: patient?.email || '',
     phoneNumber: patient?.phoneNumber || '',
-    municipal: patient?.municipal || 'Dasmariñas',
-    city: patient?.city || 'Cavite',
+    municipality: 'Dasmariñas',
+    province: 'Cavite',
     sex: patient?.sex || undefined,
     civilStatus: patient?.civilStatus || '',
     religion: patient?.religion || '',
@@ -221,7 +221,7 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
                                 placeholder={fieldConfig.placeholder}
                                 {...field}
                                 value={field.value ?? ''} // Handle null/undefined for input value
-                                disabled={isLoading || fieldConfig.name === 'municipal' || fieldConfig.name === 'city'}
+                                disabled={isLoading || fieldConfig.name === 'municipality' || fieldConfig.name === 'province'}
                               />
                           </FormControl>
                         )}

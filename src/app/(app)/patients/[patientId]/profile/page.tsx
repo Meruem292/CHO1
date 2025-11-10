@@ -198,7 +198,8 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
           <InfoItem label="Religion" value={patient.religion} />
           <InfoItem label="Ethnicity" value={patient.ethnicity} />
           <InfoItem label="Nationality" value={patient.nationality} />
-          <InfoItem label="Address" value={`${patient.city ? patient.city + ', ' : ''}${patient.municipal || ''}`} />
+          <InfoItem label="Municipality" value={patient.municipality} />
+          <InfoItem label="Province" value={patient.province} />
         </div>
         <Separator />
         <h3 className="text-lg font-medium text-primary">Latest Physical Measurements</h3>
