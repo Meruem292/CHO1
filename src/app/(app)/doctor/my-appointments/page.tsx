@@ -10,12 +10,12 @@ export default function DoctorMyAppointmentsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && user && user.role === 'doctor') {
+    if (!isLoading && user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
       router.replace(`/users/${user.id}/appointments`);
     } else if (!isLoading && !user) {
       router.replace('/login');
-    } else if (!isLoading && user && user.role !== 'doctor') {
-        router.replace('/dashboard'); // Redirect non-doctors to dashboard
+    } else if (!isLoading && user && user.role !== 'doctor' && user.role !== 'midwife/nurse') {
+        router.replace('/dashboard'); // Redirect other roles to dashboard
     }
   }, [user, isLoading, router]);
 
@@ -26,5 +26,3 @@ export default function DoctorMyAppointmentsPage() {
     </div>
   );
 }
-
-    
