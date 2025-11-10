@@ -212,16 +212,6 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("notes")?.toString() || 'N/A'}</p>,
     },
     {
-      accessorKey: 'diagnosis',
-      header: 'Diagnosis',
-      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("diagnosis")?.toString() || 'N/A'}</p>,
-    },
-    {
-      accessorKey: 'treatmentPlan',
-      header: 'Treatment Plan',
-       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("treatmentPlan")?.toString() || 'N/A'}</p>,
-    },
-    {
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
@@ -420,4 +410,3 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
-
