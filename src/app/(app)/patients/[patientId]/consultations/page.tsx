@@ -205,7 +205,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     },
     {
       accessorKey: 'notes',
-      header: 'Notes',
+      header: 'Patient Concern',
       cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("notes")?.toString() || 'N/A'}</p>,
     },
     {

@@ -101,7 +101,7 @@ export function PatientConsultationForm({ onSubmit, onCancel }: PatientConsultat
           name="notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>My Symptoms / Health Concern</FormLabel>
+              <FormLabel>My Patient Concern</FormLabel>
               <FormControl>
                 <Textarea placeholder="Please describe how you're feeling, your symptoms, or any health concerns you have..." {...field} rows={6}/>
               </FormControl>
