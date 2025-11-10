@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,8 +33,8 @@ export function BmiRecordingForm({ onSubmit, isLoading }: BmiRecordingFormProps)
   const form = useForm<BmiRecordingFormData>({
     resolver: zodResolver(bmiRecordingSchema),
     defaultValues: {
-      weightKg: undefined,
-      heightM: undefined,
+      weightKg: '' as any,
+      heightM: '' as any,
     },
   });
 
