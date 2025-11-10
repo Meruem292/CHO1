@@ -34,7 +34,10 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser, role: UserRole = 'patient', customName?: string): User => {
+const mapFirebaseUserToAppUser = (firebaseUser: FirebaseUser | null, role: UserRole = 'patient', customName?: string): User | null => {
+  if (!firebaseUser) {
+    return null;
+  }
   return {
     id: firebaseUser.uid,
     name: customName || firebaseUser.displayName || firebaseUser.email || 'User',
@@ -148,13 +151,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const appUserForContext = mapFirebaseUserToAppUser(firebaseUser, appUserRole, finalName);
     setUser(appUserForContext);
     router.push('/dashboard');
-    toast({ title: "Login Successful", description: `Welcome, ${appUserForContext.name}!` });
+    toast({ title: "Login Successful", description: `Welcome, ${appUserForContext?.name}!` });
     
     if (isNewUser) {
         // user is the user who created the account, appUserForContext is the new user
         const creator = user || appUserForContext;
-        await createAuditLog(creator, 'user_created', `Created user account for ${finalName}`, appUserForContext.id, 'user');
-    } else {
+        if (creator) {
+            await createAuditLog(creator, 'user_created', `Created user account for ${finalName}`, appUserForContext!.id, 'user');
+        }
+    } else if (appUserForContext) {
         await createAuditLog(appUserForContext, 'user_login', `User ${finalName} logged in.`, appUserForContext.id, 'user');
     }
   };
@@ -329,5 +334,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-    
