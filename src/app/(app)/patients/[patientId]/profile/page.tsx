@@ -195,11 +195,10 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
           <InfoItem label="Date of Birth" value={formatInPHTime_PPP(patient.dateOfBirth)} />
           <InfoItem label="Sex" value={patient.sex} />
           <InfoItem label="Civil Status" value={patient.civilStatus} />
+          <InfoItem label="Address" value="Dasmariñas, Cavite" />
           <InfoItem label="Religion" value={patient.religion} />
           <InfoItem label="Ethnicity" value={patient.ethnicity} />
           <InfoItem label="Nationality" value={patient.nationality} />
-          <InfoItem label="City" value={patient.city} />
-          <InfoItem label="Province" value={patient.province} />
         </div>
         <Separator />
         <h3 className="text-lg font-medium text-primary">Latest Physical Measurements</h3>
