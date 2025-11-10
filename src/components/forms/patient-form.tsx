@@ -207,7 +207,7 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false }: 
                         </FormControl>
                       ) : (
                         <FormControl>
-                          <Input placeholder={fieldConfig.placeholder} {...field} value={field.value || ''} disabled={isLoading} />
+                          <Input placeholder={fieldConfig.placeholder} {...field} disabled={isLoading} />
                         </FormControl>
                       )}
                       <FormMessage />
