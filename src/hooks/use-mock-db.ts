@@ -171,6 +171,14 @@ export function useMockDb() {
         // doctorName is already set to "Patient Entry" in the component
     }
 
+    // Remove undefined keys before sending to Firebase
+    Object.keys(dataToSave).forEach(key => {
+        const K = key as keyof typeof dataToSave;
+        if (dataToSave[K] === undefined) {
+            delete dataToSave[K];
+        }
+    });
+
     const newId = newRef.key!;
     await set(newRef, dataToSave);
     const actionBy = dataToSave.doctorName === "Patient Entry" ? "Patient" : dataToSave.doctorName;
@@ -194,6 +202,14 @@ export function useMockDb() {
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
+    
+    // Remove undefined keys before sending to Firebase
+    Object.keys(dataToUpdate).forEach(key => {
+        const K = key as keyof typeof dataToUpdate;
+        if (dataToUpdate[K] === undefined) {
+            delete dataToUpdate[K];
+        }
+    });
 
     await firebaseUpdate(ref(database, `consultations/${id}`), dataToUpdate);
     await createAuditLog(user, 'consultation_updated', `Updated consultation for ${dataToUpdate.patientName || id}`, id, 'consultation', { changes: updates });
