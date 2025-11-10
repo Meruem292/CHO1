@@ -155,7 +155,10 @@ export function useMockDb() {
     if (!user) throw new Error("User must be logged in to add a consultation.");
     const newRef = push(ref(database, 'consultations'));
     const patientRec = patients.find(p => p.id === consultationData.patientId);
+    
+    // Add default values for fields that might be missing from a patient-submitted form
     const dataToSave: Omit<ConsultationRecord, 'id'> & { doctorId?: string; doctorName?: string; patientName?: string; } = {
+         notes: '', // default empty notes
          ...consultationData,
          patientName: patientRec?.name || 'Unknown Patient',
          createdAt: serverTimestamp()
@@ -164,12 +167,17 @@ export function useMockDb() {
     if (user && user.role === 'doctor') {
         dataToSave.doctorId = user.id;
         dataToSave.doctorName = user.name;
+    } else if (user && user.role === 'patient') {
+        // doctorName is already set to "Patient Entry" in the component
     }
+
     const newId = newRef.key!;
     await set(newRef, dataToSave);
-    await createAuditLog(user, 'consultation_created', `Added consultation for ${dataToSave.patientName}`, newId, 'consultation');
+    const actionBy = dataToSave.doctorName === "Patient Entry" ? "Patient" : dataToSave.doctorName;
+    await createAuditLog(user, 'consultation_created', `Added consultation for ${dataToSave.patientName} (Entry by: ${actionBy})`, newId, 'consultation');
     return { ...dataToSave, id: newId } as ConsultationRecord;
-  }, [user, patients]);
+}, [user, patients]);
+
 
   const updateConsultation = useCallback(async (id: string, updates: Partial<Omit<ConsultationRecord, 'id'>>) => {
     if (!user) throw new Error("User must be logged in to update a consultation.");

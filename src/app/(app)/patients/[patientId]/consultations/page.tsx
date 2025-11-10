@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ConsultationForm } from '@/components/forms/consultation-form';
+import { PatientConsultationForm } from '@/components/forms/patient-consultation-form';
 import { toast } from '@/hooks/use-toast';
 import { parseISO } from 'date-fns';
 import { database } from '@/lib/firebase-config';
@@ -77,7 +78,8 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   } = useMockDb();
   
   const [patientName, setPatientName] = useState<string>(''); 
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDoctorFormOpen, setIsDoctorFormOpen] = useState(false);
+  const [isPatientFormOpen, setIsPatientFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToArchive, setConsultationToArchive] = useState<ConsultationRecord | null>(null);
   
@@ -93,8 +95,29 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     };
   }, [patientId, getConsultationsByPatientId]);
 
+  const handlePatientFormSubmit = async (data: { date: string; notes: string; }) => {
+    if (user?.role !== 'patient' || user.id !== patientId) {
+      toast({ variant: 'destructive', title: 'Permission Denied', description: 'You can only add notes to your own record.' });
+      return;
+    }
+    const consultationPayload: Omit<ConsultationRecord, 'id'> = {
+      ...data,
+      patientId: user.id,
+      doctorName: "Patient Entry", // Special designation for patient entries
+      subjectType: 'mother', // Patient can only submit notes for themselves for now.
+    };
 
-  const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+    try {
+      await addConsultation(consultationPayload);
+      toast({ title: "Health Notes Added", description: "Your notes have been saved to your record." });
+      setIsPatientFormOpen(false);
+    } catch (error) {
+       console.error("Error submitting patient consultation form:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save your notes." });
+    }
+  };
+
+  const handleDoctorFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
     if (user?.role !== 'doctor') {
       toast({ variant: 'destructive', title: 'Permission Denied', description: 'Only doctors can add or edit consultations.' });
       return;
@@ -119,7 +142,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         await addConsultation(fullConsultationData);
         toast({ title: "Consultation Added", description: `New record for ${formatInPHTime_PPP(data.date)} added.` });
       }
-      setIsFormOpen(false);
+      setIsDoctorFormOpen(false);
       setEditingConsultation(undefined);
     } catch (error) {
       console.error("Error submitting consultation form:", error);
@@ -129,7 +152,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
 
   const openEditForm = (consultation: ConsultationRecord) => {
     setEditingConsultation(consultation);
-    setIsFormOpen(true);
+    setIsDoctorFormOpen(true);
   };
 
   const handleArchiveConfirm = async () => {
@@ -169,8 +192,16 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     },
     {
       accessorKey: 'doctorName',
-      header: 'Doctor',
-      cell: ({ row }) => row.original.doctorName || 'N/A',
+      header: 'Recorded By',
+      cell: ({ row }) => {
+        const recordedBy = row.original.doctorName || 'N/A';
+        const isPatientEntry = recordedBy === 'Patient Entry';
+        return (
+          <span className={isPatientEntry ? 'italic text-muted-foreground' : ''}>
+            {recordedBy}
+          </span>
+        );
+      },
     },
     {
       accessorKey: 'notes',
@@ -191,8 +222,10 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       id: 'actions',
       cell: ({ row }) => {
         const consultation = row.original;
-        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === consultation.doctorId);
-        if (!canEdit) return null; 
+        // Only doctors can edit their own entries. Admins can archive.
+        const canEdit = user?.role === 'doctor' && user.id === consultation.doctorId;
+        const canArchive = user?.role === 'admin' || canEdit;
+        if (!canArchive) return null;
 
         return (
           <DropdownMenu>
@@ -204,13 +237,17 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => openEditForm(consultation)} disabled={user?.role !== 'doctor'}>
-                <Edit className="mr-2 h-4 w-4" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={user?.role !== 'doctor' && user?.role !== 'admin'}>
-                <Archive className="mr-2 h-4 w-4" /> Archive
-              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem onClick={() => openEditForm(consultation)}>
+                  <Edit className="mr-2 h-4 w-4" /> Edit
+                </DropdownMenuItem>
+              )}
+              {canArchive && canEdit && <DropdownMenuSeparator />}
+              {canArchive && (
+                <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <Archive className="mr-2 h-4 w-4" /> Archive
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -237,8 +274,13 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Consultation History</h2>
         {user?.role === 'doctor' && (
-          <Button onClick={() => { setEditingConsultation(undefined); setIsFormOpen(true); }}>
+          <Button onClick={() => { setEditingConsultation(undefined); setIsDoctorFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Consultation
+          </Button>
+        )}
+        {user?.role === 'patient' && user.id === patientId && (
+          <Button onClick={() => setIsPatientFormOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add My Health Notes
           </Button>
         )}
       </div>
@@ -254,7 +296,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <AlertTitle>No Consultation Records</AlertTitle>
             <AlertDescription>
                 There are no consultation records available for {patientName} yet.
-                {user?.role === 'doctor' && " You can add a new one."}
+                {(user?.role === 'doctor' || (user?.role === 'patient' && user.id === patientId)) && " You can add a new one."}
             </AlertDescription>
         </Alert>
       ) : (
@@ -262,11 +304,12 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             columns={columns}
             data={consultations}
             filterColumnId="doctorName" 
-            filterPlaceholder="Filter by doctor, notes..."
+            filterPlaceholder="Filter by recorded by, notes..."
         />
       )}
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      {/* Dialog for Doctor's Form */}
+      <Dialog open={isDoctorFormOpen} onOpenChange={setIsDoctorFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingConsultation ? 'Edit Consultation' : 'Add New Consultation'}</DialogTitle>
@@ -279,8 +322,24 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
           </DialogHeader>
           <ConsultationForm
             consultation={editingConsultation}
-            onSubmit={handleFormSubmit}
-            onCancel={() => setIsFormOpen(false)}
+            onSubmit={handleDoctorFormSubmit}
+            onCancel={() => setIsDoctorFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+      
+      {/* Dialog for Patient's Form */}
+      <Dialog open={isPatientFormOpen} onOpenChange={setIsPatientFormOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Your Health Notes</DialogTitle>
+            <DialogDescription>
+              Describe your symptoms or concerns. This will be saved to your health record for your doctor to review.
+            </DialogDescription>
+          </DialogHeader>
+          <PatientConsultationForm
+            onSubmit={handlePatientFormSubmit}
+            onCancel={() => setIsPatientFormOpen(false)}
           />
         </DialogContent>
       </Dialog>
