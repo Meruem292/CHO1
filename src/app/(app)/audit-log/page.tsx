@@ -10,15 +10,18 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { AuditLog } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ChevronLeft, ListOrdered, ShieldAlert } from 'lucide-react';
-import { format, fromUnixTime } from 'date-fns';
+import { format, fromUnixTime, isValid } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatTimestamp(timestamp: any): string {
-  if (!timestamp) return "N/A";
+  if (!timestamp || typeof timestamp !== 'number') return "N/A";
   try {
-    // Firebase serverTimestamp is an object, on read it gives milliseconds since epoch
-    const date = fromUnixTime(timestamp / 1000);
+    // Firebase serverTimestamp is milliseconds since epoch on read.
+    const date = new Date(timestamp);
+    if (!isValid(date)) {
+        return "Invalid Date";
+    }
     const datePart = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(date);
     const timePart = new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).format(date);
     return `${datePart}, ${timePart}`;
@@ -35,7 +38,8 @@ export default function AuditLogPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Only admins should fetch the full log
+    // Only admins should fetch the full log for now.
+    // This can be expanded later to fetch user-specific logs.
     if (user?.role === 'admin') {
       const unsubscribe = getAuditLogs(200, setLogs, setIsLoading); // Fetch last 200 logs
       return () => unsubscribe();
@@ -102,15 +106,15 @@ export default function AuditLogPage() {
         </h1>
       </div>
       <p className="text-muted-foreground">
-        A chronological record of all significant activities within the application.
+        A chronological record of significant activities within the application.
       </p>
 
       {user?.role !== 'admin' && (
-        <Alert variant="destructive">
+        <Alert>
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Administrator View</AlertTitle>
           <AlertDescription>
-            The full audit log is available for administrators only.
+            The full application audit log is available for administrators only. Future updates may include a view of your own activities.
           </AlertDescription>
         </Alert>
       )}
@@ -127,7 +131,7 @@ export default function AuditLogPage() {
         <DataTable
           columns={columns}
           data={logs}
-          filterColumnId="description"
+          filterColumnId="userName" // Default filter
           filterPlaceholder="Filter by user, action, or description..."
         />
       )}
