@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope, Archive, MessageSquarePlus } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Trash2, Edit, Loader2, ClipboardList, AlertTriangle, UserMdIcon, Stethoscope, Archive, MessageSquarePlus, Eye } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -83,6 +84,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   const [isPatientFormOpen, setIsPatientFormOpen] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRecord | undefined>(undefined);
   const [consultationToArchive, setConsultationToArchive] = useState<ConsultationRecord | null>(null);
+  const [consultationToView, setConsultationToView] = useState<ConsultationRecord | null>(null);
   
   useEffect(() => {
     const patientRecordRef = dbRef(database, `patients/${patientId}/name`);
@@ -212,7 +214,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     {
       accessorKey: 'diagnosis',
       header: 'Diagnosis',
-      cell: ({ row }) => row.getValue("diagnosis")?.toString() || 'N/A',
+      cell: ({ row }) => <p className="truncate max-w-xs">{row.getValue("diagnosis")?.toString() || 'N/A'}</p>,
     },
     {
       accessorKey: 'treatmentPlan',
@@ -224,46 +226,57 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
       cell: ({ row }) => {
         const consultation = row.original;
         const isPatientEntry = consultation.doctorName === "Patient Entry";
+        const isOwnRecord = user?.id === patientId;
+        const hasResponse = consultation.diagnosis || consultation.treatmentPlan;
+
         const canEditOwn = user?.role === 'doctor' && user.id === consultation.doctorId;
         const canRespondToPatient = user?.role === 'doctor' && isPatientEntry;
         const canArchive = user?.role === 'admin' || canEditOwn;
 
-        if (!canArchive && !canEditOwn && !canRespondToPatient) return null;
-
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
+          <div className="flex items-center space-x-2">
+            {user?.role === 'patient' && isOwnRecord && hasResponse && (
+              <Button variant="outline" size="sm" onClick={() => setConsultationToView(consultation)}>
+                <Eye className="mr-2 h-4 w-4" /> View Response
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {canRespondToPatient && (
-                <Link href={`/patients/${patientId}/consultations/${consultation.id}/respond`} passHref>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <MessageSquarePlus className="mr-2 h-4 w-4" /> Respond
-                  </DropdownMenuItem>
-                </Link>
-              )}
-               {canEditOwn && (
-                <DropdownMenuItem onClick={() => openEditForm(consultation)}>
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </DropdownMenuItem>
-              )}
-              {canArchive && (canEditOwn || canRespondToPatient) && <DropdownMenuSeparator />}
-              {canArchive && (
-                <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <Archive className="mr-2 h-4 w-4" /> Archive
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            
+            {(canEditOwn || canRespondToPatient || canArchive) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  {canRespondToPatient && (
+                    <Link href={`/patients/${patientId}/consultations/${consultation.id}/respond`} passHref>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <MessageSquarePlus className="mr-2 h-4 w-4" /> Respond
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
+                  {canEditOwn && (
+                    <DropdownMenuItem onClick={() => openEditForm(consultation)}>
+                      <Edit className="mr-2 h-4 w-4" /> Edit Response
+                    </DropdownMenuItem>
+                  )}
+                  {canArchive && (canEditOwn || canRespondToPatient) && <DropdownMenuSeparator />}
+                  {canArchive && (
+                    <DropdownMenuItem onClick={() => setConsultationToArchive(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                      <Archive className="mr-2 h-4 w-4" /> Archive
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         );
       },
     },
-  ], [user?.role, user?.id, openEditForm, setConsultationToArchive, patientId]);
+  ], [user?.role, user?.id, patientId, openEditForm, setConsultationToArchive]);
 
 
   if (user?.role === 'midwife/nurse') {
@@ -324,7 +337,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
           <DialogHeader>
             <DialogTitle>
                 {editingConsultation 
-                    ? 'Edit Consultation' 
+                    ? `Edit Response for ${formatInPHTime_PPP(editingConsultation?.date)}`
                     : 'Add New Consultation'}
             </DialogTitle>
             <DialogDescription>
@@ -372,6 +385,39 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {consultationToView && (
+        <Dialog open={!!consultationToView} onOpenChange={() => setConsultationToView(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Doctor's Response</DialogTitle>
+              <DialogDescription>
+                Response from {consultationToView.doctorName} on {formatInPHTime_PPP(consultationToView.date)}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div>
+                <h4 className="font-semibold">Patient Concern</h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{consultationToView.notes || 'No concern noted.'}</p>
+              </div>
+              <hr />
+              <div>
+                <h4 className="font-semibold">Diagnosis</h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{consultationToView.diagnosis || 'No diagnosis provided.'}</p>
+              </div>
+              <div>
+                <h4 className="font-semibold">Treatment Plan</h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{consultationToView.treatmentPlan || 'No treatment plan provided.'}</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setConsultationToView(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }
+
