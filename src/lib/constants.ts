@@ -123,7 +123,7 @@ export const PATIENT_NAV_ITEMS: NavItem[] = [
     href: '/consultations', // Appends to /patients/[patientId]
     label: 'Consultations',
     icon: ClipboardList,
-    roles: ['admin', 'doctor', 'midwife/nurse'],
+    roles: ['admin', 'doctor'], // Only admin and doctor can see this tab
     patientSpecific: true,
   },
   {
@@ -140,17 +140,6 @@ export const PATIENT_NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'doctor', 'midwife/nurse'],
     patientSpecific: true,
   },
-  // This one would need to navigate to /users/[patientId]/appointments
-  // If we add this, SidebarNavItems needs to be aware of 'viewingPatientId' context to build this link correctly.
-  // For now, admin/doctor access specific patient appointments via the main "Manage Appointments" or by going to the patient's profile if that's built.
-  // Let's keep it simple for now and not add this specific link in the patient sub-menu.
-  // {
-  //   href: `/users/[patientId]/appointments`, // This is tricky, needs dynamic patientId from context
-  //   label: "Patient's Appointments",
-  //   icon: CalendarClock,
-  //   roles: ['admin', 'doctor'],
-  //   patientSpecific: true, // or a new flag like 'contextualPatientSpecific'
-  // }
 ];
 
 export const APP_NAME = 'City Health Office';

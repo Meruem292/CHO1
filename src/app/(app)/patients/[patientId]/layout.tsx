@@ -60,7 +60,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
       if (currentUser.role === 'admin' || (currentUser.role === 'patient' && currentUser.id === patientId)) {
         setHasAccess(true);
         setIsLoading(false);
-      } else if (currentUser.role === 'doctor') {
+      } else if (currentUser.role === 'doctor' || currentUser.role === 'midwife/nurse') {
         const doctorAppointmentsQuery = query(dbRef(database, 'appointments'), orderByChild('doctorId'), equalTo(currentUser.id));
         const unsubAppointments = onValue(doctorAppointmentsQuery, (appSnapshot) => {
           const appointments = snapshotToArray<Appointment>(appSnapshot);
@@ -138,19 +138,21 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
     );
   }
 
-  const navItems = [
+  const baseNavItems = [
     { value: 'profile', label: 'Patient Info', icon: User, href: `/patients/${patientId}/profile` },
-    { value: 'consultations', label: 'Consultations', icon: ClipboardList, href: `/patients/${patientId}/consultations` },
+    { value: 'consultations', label: 'Consultations', icon: ClipboardList, href: `/patients/${patientId}/consultations`, roles: ['admin', 'doctor'] },
     { value: 'maternity-history', label: 'Maternity History', icon: Baby, href: `/patients/${patientId}/maternity-history` },
     { value: 'baby-health', label: 'Baby Health', icon: HeartPulse, href: `/patients/${patientId}/baby-health` },
   ];
+
+  const navItems = baseNavItems.filter(item => !item.roles || (currentUser && item.roles.includes(currentUser.role)));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <Link href={currentUser?.role === 'patient' ? "/dashboard" : "/patients"} className="flex items-center text-sm text-primary hover:underline">
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to {currentUser?.role === 'patient' ? "Dashboard" : (currentUser?.role === 'doctor' ? "My Patients" : "Patients List")}
+            Back to {currentUser?.role === 'patient' ? "Dashboard" : (currentUser?.role === 'doctor' || currentUser?.role === 'midwife/nurse' ? "My Patients" : "Patients List")}
         </Link>
         <h1 className="text-2xl font-bold font-headline truncate">
           Patient Records: <span className="text-primary">{patient.name}</span>
@@ -160,7 +162,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
 
 
       <Tabs value={activeTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
+        <TabsList className={`grid w-full grid-cols-${navItems.length} mb-6`}>
           {navItems.map(item => (
             <TabsTrigger value={item.value} key={item.value} asChild>
               <Link href={item.href} className="flex items-center justify-center gap-2">

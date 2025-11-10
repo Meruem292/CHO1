@@ -209,7 +209,7 @@ export function useMockDb() {
         patientName: patientRec?.name || 'Unknown Patient',
         createdAt: serverTimestamp()
     };
-    if (user && user.role === 'doctor') {
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
         dataToSave.doctorId = user.id;
         dataToSave.doctorName = user.name;
     }
@@ -226,7 +226,7 @@ export function useMockDb() {
     if (patientRec) {
       dataToUpdate.patientName = patientRec.name;
     }
-     if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
+     if (user && (user.role === 'doctor' || user.role === 'midwife/nurse') && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
@@ -273,7 +273,7 @@ export function useMockDb() {
         motherName: motherRec?.name || 'Unknown Mother',
         createdAt: serverTimestamp()
     };
-    if (user && user.role === 'doctor') {
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
         dataToSave.doctorId = user.id;
         dataToSave.doctorName = user.name;
     }
@@ -290,7 +290,7 @@ export function useMockDb() {
     if (motherRec) {
       dataToUpdate.motherName = motherRec.name;
     }
-    if (user && user.role === 'doctor' && !updates.doctorId && !updates.doctorName) { 
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse') && !updates.doctorId && !updates.doctorName) { 
         dataToUpdate.doctorId = user.id;
         dataToUpdate.doctorName = user.name;
     }
@@ -473,11 +473,9 @@ export function useMockDb() {
   // Doctor Activity Log Functions
   const getConsultationsByDoctor = useCallback((doctorId: string) => {
     setDoctorActivityLoading(true);
-    const consultsRef = ref(database, 'consultations');
-    const unsubscribe = onValue(consultsRef, (snapshot) => {
-      const allConsults = snapshotToArray<ConsultationRecord>(snapshot);
-      const doctorConsults = allConsults
-        .filter(c => c.doctorId === doctorId)
+    const consultsQuery = query(ref(database, 'consultations'), orderByChild('doctorId'), equalTo(doctorId));
+    const unsubscribe = onValue(consultsQuery, (snapshot) => {
+      const doctorConsults = snapshotToArray<ConsultationRecord>(snapshot)
         .map(c => ({ ...c, patientName: patients.find(p => p.id === c.patientId)?.name || c.patientName || 'Unknown Patient' }))
         .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setDoctorActivityConsultations(doctorConsults);
@@ -491,11 +489,9 @@ export function useMockDb() {
 
   const getMaternityRecordsByDoctor = useCallback((doctorId: string) => {
     setDoctorActivityLoading(true);
-    const maternityRef = ref(database, 'maternityRecords');
-    const unsubscribe = onValue(maternityRef, (snapshot) => {
-      const allMaternity = snapshotToArray<MaternityRecord>(snapshot);
-      const doctorMaternity = allMaternity
-        .filter(m => m.doctorId === doctorId)
+    const maternityQuery = query(ref(database, 'maternityRecords'), orderByChild('doctorId'), equalTo(doctorId));
+    const unsubscribe = onValue(maternityQuery, (snapshot) => {
+      const doctorMaternity = snapshotToArray<MaternityRecord>(snapshot)
         .map(m => ({ ...m, patientName: patients.find(p => p.id === m.patientId)?.name || m.patientName || 'Unknown Patient' }))
         .sort((a,b) => (b.pregnancyNumber || 0) - (a.pregnancyNumber || 0));
       setDoctorActivityMaternity(doctorMaternity);
@@ -509,11 +505,9 @@ export function useMockDb() {
 
   const getBabyRecordsByDoctor = useCallback((doctorId: string) => {
     setDoctorActivityLoading(true);
-    const babyRef = ref(database, 'babyRecords');
-    const unsubscribe = onValue(babyRef, (snapshot) => {
-      const allBaby = snapshotToArray<BabyRecord>(snapshot);
-      const doctorBaby = allBaby
-        .filter(b => b.doctorId === doctorId)
+    const babyQuery = query(ref(database, 'babyRecords'), orderByChild('doctorId'), equalTo(doctorId));
+    const unsubscribe = onValue(babyQuery, (snapshot) => {
+      const doctorBaby = snapshotToArray<BabyRecord>(snapshot)
         .map(b => ({ ...b, motherName: patients.find(p => p.id === b.motherId)?.name || b.motherName || 'Unknown Mother' }))
         .sort((a,b) => new Date(b.birthDate).getTime() - new Date(a.birthDate).getTime());
       setDoctorActivityBaby(doctorBaby);
@@ -542,4 +536,3 @@ export function useMockDb() {
     getConsultationsByDoctor, getMaternityRecordsByDoctor, getBabyRecordsByDoctor,
   };
 }
-

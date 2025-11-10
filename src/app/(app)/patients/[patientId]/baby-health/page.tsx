@@ -97,7 +97,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     const recordBaseData = { ...data, motherId };
     let fullRecordData: Omit<BabyRecord, 'id'> = { ...recordBaseData };
 
-    if (user && user.role === 'doctor') {
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
         fullRecordData = {
             ...fullRecordData,
             doctorId: user.id,
@@ -185,7 +185,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
       id: 'actions',
       cell: ({ row }) => {
         const record = row.original;
-        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === record.doctorId);
+        const canEdit = user?.role === 'admin' || ((user?.role === 'doctor' || user?.role === 'midwife/nurse') && user.id === record.doctorId);
         if (!canEdit && user?.role !== 'patient') return null;
         if (user?.role === 'patient') return null;
 
@@ -217,7 +217,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Baby Health Records for {motherName}'s Child(ren)</h2>
-        {(user?.role === 'admin' || user?.role === 'doctor') && (
+        {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && (
             <Button onClick={() => { setEditingRecord(undefined); setIsFormOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Baby Record
             </Button>
@@ -235,7 +235,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             <AlertTitle>No Baby Health Records</AlertTitle>
             <AlertDescription>
                 There are no baby health records available for {motherName}'s children yet.
-                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
+                {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && " You can add a new one."}
             </AlertDescription>
         </Alert>
       ): (
@@ -253,9 +253,9 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
             <DialogTitle>{editingRecord ? 'Edit Baby Record' : 'Add New Baby Record'}</DialogTitle>
             <DialogDescription>
               Manage baby health records for {motherName}'s child.
-              {user?.role === 'doctor' && !editingRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
-              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId === user.id && ` You are editing your entry.`}
-              {user?.role === 'doctor' && editingRecord && editingRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingRecord.doctorName || 'another doctor/admin'}.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && !editingRecord && ` This record will be attributed to you, ${user.name}.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && editingRecord && editingRecord.doctorId === user.id && ` You are editing your entry.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && editingRecord && editingRecord.doctorId !== user.id && ` You are editing an entry made by ${editingRecord.doctorName || 'another provider'}.`}
             </DialogDescription>
           </DialogHeader>
           <BabyHealthForm
@@ -285,4 +285,3 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
     </div>
   );
 }
-

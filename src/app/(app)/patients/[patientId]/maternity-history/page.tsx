@@ -105,7 +105,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     const recordBaseData = { ...data, patientId };
     let fullRecordData: Omit<MaternityRecord, 'id'> = { ...recordBaseData };
 
-    if (user && user.role === 'doctor') {
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
       fullRecordData = {
         ...fullRecordData,
         doctorId: user.id,
@@ -151,7 +151,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     const recordBaseData = { ...babyData, motherId: patientId }; // motherId is the current patientId
     let fullRecordData: Omit<BabyRecord, 'id'> = { ...recordBaseData };
 
-    if (user && user.role === 'doctor') {
+    if (user && (user.role === 'doctor' || user.role === 'midwife/nurse')) {
         fullRecordData = {
             ...fullRecordData,
             doctorId: user.id,
@@ -209,7 +209,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
       id: 'actions',
       cell: ({ row }) => {
         const record = row.original;
-        const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === record.doctorId);
+        const canEdit = user?.role === 'admin' || ((user?.role === 'doctor' || user?.role === 'midwife/nurse') && user.id === record.doctorId);
         if (!canEdit && user?.role !== 'patient') return null; 
         if (user?.role === 'patient') return null;
 
@@ -242,12 +242,12 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Maternity History</h2>
          <div className="flex space-x-2">
-            {(user?.role === 'admin' || user?.role === 'doctor') && (
+            {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && (
                 <Button onClick={() => { setEditingMaternityRecord(undefined); setIsMaternityFormOpen(true); }}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Maternity Record
                 </Button>
             )}
-            {(user?.role === 'admin' || user?.role === 'doctor') && (
+            {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && (
                 <Button variant="secondary" onClick={() => setIsRegisterBabyFormOpen(true)}>
                     <HeartPulse className="mr-2 h-4 w-4" /> Register Baby
                 </Button>
@@ -266,7 +266,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <AlertTitle>No Maternity History</AlertTitle>
             <AlertDescription>
                 There are no maternity history records available for {patientName} yet.
-                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one or register a baby."}
+                {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && " You can add a new one or register a baby."}
             </AlertDescription>
         </Alert>
       ) : (
@@ -284,9 +284,9 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <DialogTitle>{editingMaternityRecord ? 'Edit Maternity Record' : 'Add New Maternity Record'}</DialogTitle>
             <DialogDescription>
               Manage maternity history for {patientName}.
-              {user?.role === 'doctor' && !editingMaternityRecord && ` This record will be attributed to you, Dr. ${user.name}.`}
-              {user?.role === 'doctor' && editingMaternityRecord && editingMaternityRecord.doctorId === user.id && ` You are editing your entry.`}
-              {user?.role === 'doctor' && editingMaternityRecord && editingMaternityRecord.doctorId !== user.id && ` You are editing an entry made by Dr. ${editingMaternityRecord.doctorName || 'another doctor/admin'}.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && !editingMaternityRecord && ` This record will be attributed to you, ${user.name}.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && editingMaternityRecord && editingMaternityRecord.doctorId === user.id && ` You are editing your entry.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && editingMaternityRecord && editingMaternityRecord.doctorId !== user.id && ` You are editing an entry made by ${editingMaternityRecord.doctorName || 'another provider'}.`}
             </DialogDescription>
           </DialogHeader>
           <MaternityHistoryForm
@@ -321,7 +321,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
             <DialogTitle>Register New Baby for {patientName}</DialogTitle>
             <DialogDescription>
               Fill in the details for the new baby.
-              {user?.role === 'doctor' && ` This record will be attributed to you, Dr. ${user.name}.`}
+              {(user?.role === 'doctor' || user?.role === 'midwife/nurse') && ` This record will be attributed to you, ${user.name}.`}
             </DialogDescription>
           </DialogHeader>
           <BabyHealthForm
@@ -335,4 +335,3 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
     </div>
   );
 }
-

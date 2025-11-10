@@ -97,6 +97,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
 
 
   const handleFormSubmit = async (data: Omit<ConsultationRecord, 'id' | 'patientId' | 'doctorId' | 'doctorName'>) => {
+    if (user?.role !== 'doctor') {
+      toast({ variant: 'destructive', title: 'Permission Denied', description: 'Only doctors can add or edit consultations.' });
+      return;
+    }
+    
     const consultationBaseData = { ...data, patientId };
     let fullConsultationData: Omit<ConsultationRecord, 'id'> = { ...consultationBaseData };
 
@@ -133,6 +138,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
 
   const handleDeleteConfirm = async () => {
     if (consultationToDelete) {
+      if (user?.role !== 'doctor' && user?.role !== 'admin') {
+         toast({ variant: 'destructive', title: 'Permission Denied', description: 'Only doctors or admins can delete consultations.' });
+         setConsultationToDelete(null);
+        return;
+      }
       try {
         await deleteConsultation(consultationToDelete.id);
         toast({ title: "Consultation Deleted", description: `Record from ${consultationToDelete.date ? formatInPHTime_PPP(consultationToDelete.date) : 'this record'} deleted.` });
@@ -187,8 +197,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
         const consultation = row.original;
         // Only allow editing/deleting if user is admin or the doctor who created the record
         const canEdit = user?.role === 'admin' || (user?.role === 'doctor' && user.id === consultation.doctorId);
-        if (!canEdit && user?.role !== 'patient') return null; // Patients see read-only, no actions
-        if (user?.role === 'patient') return null;
+        if (!canEdit) return null; // Patients & Midwives see read-only, no actions
 
 
         return (
@@ -201,11 +210,11 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => openEditForm(consultation)}>
+              <DropdownMenuItem onClick={() => openEditForm(consultation)} disabled={user?.role !== 'doctor'}>
                 <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setConsultationToDelete(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+              <DropdownMenuItem onClick={() => setConsultationToDelete(consultation)} className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled={user?.role !== 'doctor' && user?.role !== 'admin'}>
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -216,11 +225,24 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
   ], [user?.role, user?.id, openEditForm, setConsultationToDelete]);
 
 
+  if (user?.role === 'midwife/nurse') {
+    return (
+       <Alert variant="destructive">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Access Denied</AlertTitle>
+        <AlertDescription>
+          You do not have permission to manage consultation records. This section is for Doctors only.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+
   return (
     <div className="space-y-6 mt-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Consultation History</h2>
-        {(user?.role === 'admin' || user?.role === 'doctor') && (
+        {user?.role === 'doctor' && (
           <Button onClick={() => { setEditingConsultation(undefined); setIsFormOpen(true); }}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Consultation
           </Button>
@@ -238,7 +260,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
             <AlertTitle>No Consultation Records</AlertTitle>
             <AlertDescription>
                 There are no consultation records available for {patientName} yet.
-                {(user?.role === 'admin' || user?.role === 'doctor') && " You can add a new one."}
+                {user?.role === 'doctor' && " You can add a new one."}
             </AlertDescription>
         </Alert>
       ) : (
@@ -288,4 +310,3 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
     </div>
   );
 }
-
