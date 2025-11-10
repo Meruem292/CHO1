@@ -463,6 +463,12 @@ export function useMockDb() {
   }, []);
 
   const getAllAppointments = useCallback(() => {
+    // Role-guard this function to prevent unauthorized access
+    if (user?.role !== 'admin') {
+      setAllAppointmentsLoading(false);
+      return () => {}; // Return an empty unsubscribe function
+    }
+
     setAllAppointmentsLoading(true);
     const appointmentsRef = ref(database, 'appointments');
     const unsubscribe = onValue(appointmentsRef, (snapshot) => {
@@ -485,7 +491,7 @@ export function useMockDb() {
       setAllAppointmentsLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [user]);
 
 
   const getAppointmentsByDoctorIdForBooking = useCallback((doctorId: string) => {
