@@ -18,6 +18,7 @@ import {
 import { auth, database } from '@/lib/firebase-config'; // Import Firebase auth and database instances
 import { ref as dbRef, set, get, update, serverTimestamp } from 'firebase/database'; // Firebase RTDB functions
 import { toast } from '@/hooks/use-toast';
+import { createAuditLog } from '@/hooks/use-audit';
 
 interface AuthContextType {
   user: User | null;
@@ -83,11 +84,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleAuthSuccess = async (firebaseUser: FirebaseUser, constructedName?: string, roleOverride?: UserRole) => {
     const finalName = constructedName || firebaseUser.displayName || firebaseUser.email || 'User';
     let appUserRole: UserRole = roleOverride || 'patient'; // Default role if not overridden or found in DB
+    let isNewUser = false;
 
     const patientRecordRef = dbRef(database, `patients/${firebaseUser.uid}`);
     const snapshot = await get(patientRecordRef);
 
     if (!snapshot.exists()) {
+      isNewUser = true;
       // Record doesn't exist, create it
       const patientDataForDb: any = {
         name: finalName,
@@ -115,7 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const updates: any = {};
       if (finalName && existingData.name !== finalName) updates.name = finalName;
       if (firebaseUser.email && existingData.email !== firebaseUser.email) updates.email = firebaseUser.email;
-      if (appUserRole && existingData.role !== appUserRole) updates.role = appUserRole;
+      if (appUserRole && existingData.role !== appUserRole) {
+        updates.role = appUserRole;
+        if (user) { // Ensure there's a logged-in user to attribute the change to
+           await createAuditLog(user, 'user_role_changed', `Changed role for ${finalName} to ${appUserRole}`, firebaseUser.uid, 'user', { oldRole: existingData.role, newRole: appUserRole });
+        }
+      }
       
       // Update name parts if they were part of constructedName and differ or missing
       if (constructedName) {
@@ -141,6 +149,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(appUserForContext);
     router.push('/dashboard');
     toast({ title: "Login Successful", description: `Welcome, ${appUserForContext.name}!` });
+    
+    if (isNewUser) {
+        // user is the user who created the account, appUserForContext is the new user
+        const creator = user || appUserForContext;
+        await createAuditLog(creator, 'user_created', `Created user account for ${finalName}`, appUserForContext.id, 'user');
+    } else {
+        await createAuditLog(appUserForContext, 'user_login', `User ${finalName} logged in.`, appUserForContext.id, 'user');
+    }
   };
 
   const handleAuthError = (error: any) => {
@@ -259,8 +275,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [loginWithProvider]);
 
   const logout = useCallback(async () => {
+    if (!user) return;
     setIsLoading(true);
     try {
+      await createAuditLog(user, 'user_logout', `User ${user.name} logged out.`, user.id, 'user');
       await signOut(auth);
       setUser(null);
       router.push('/login');
@@ -270,7 +288,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [router, user]);
 
   const bootstrapAdminUser = useCallback(async (config: AdminBootstrapConfig) => {
     setIsLoading(true);
@@ -312,3 +330,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+    

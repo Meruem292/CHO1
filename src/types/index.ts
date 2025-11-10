@@ -1,5 +1,4 @@
 
-
 export type UserRole = 'admin' | 'doctor' | 'midwife/nurse' | 'patient';
 
 export interface User {
@@ -178,7 +177,7 @@ export interface AppointmentBookingFormData {
 export type AuditLogAction =
   | 'user_created'
   | 'user_role_changed'
-  | 'user_deleted'
+  | 'user_deleted' // This is now 'archive'
   | 'user_login'
   | 'user_logout'
   | 'patient_record_created'
@@ -186,17 +185,19 @@ export type AuditLogAction =
   | 'patient_record_archived'
   | 'consultation_created'
   | 'consultation_updated'
-  | 'consultation_deleted'
+  | 'consultation_deleted' // This is now 'archive'
   | 'maternity_record_created'
   | 'maternity_record_updated'
-  | 'maternity_record_deleted'
+  | 'maternity_record_deleted' // This is now 'archive'
   | 'baby_record_created'
   | 'baby_record_updated'
-  | 'baby_record_deleted'
+  | 'baby_record_deleted' // This is now 'archive'
   | 'appointment_booked'
   | 'appointment_cancelled'
   | 'appointment_completed'
-  | 'schedule_updated';
+  | 'schedule_updated'
+  | 'record_restored'
+  | 'record_permanently_deleted';
 
 export interface AuditLog {
   id: string;
@@ -210,3 +211,5 @@ export interface AuditLog {
   description: string; // Human-readable description of the action
   details?: Record<string, any>; // For storing before/after states or other metadata
 }
+
+    
