@@ -52,6 +52,17 @@ export default function UserManagementPage() {
   const displayedUsers = useMemo(() => allUsers, [allUsers]);
 
   const handleAddUserSubmit = async (data: AdminCreateUserFormData) => {
+    // Check if email already exists in the database
+    const emailExists = allUsers.some(u => u.email === data.email);
+    if (emailExists) {
+      toast({
+        variant: "destructive",
+        title: "Email Already Exists",
+        description: "A user with this email address is already registered in the database.",
+      });
+      return; // Stop the submission
+    }
+
     try {
       // Call adminCreateUserWithEmail, which handles Auth and DB record creation
       await adminCreateUserWithEmail(
@@ -131,11 +142,13 @@ export default function UserManagementPage() {
       header: 'Role',
       cell: ({ row }) => {
         const role = row.getValue("role") as UserRole;
+        const roleText = role === 'midwife/nurse' ? 'Midwife/Nurse' : role.charAt(0).toUpperCase() + role.slice(1);
         return <span className={`px-2 py-1 text-xs font-medium rounded-full ${
             role === 'admin' ? 'bg-red-100 text-red-700' :
             role === 'doctor' ? 'bg-blue-100 text-blue-700' :
+            role === 'midwife/nurse' ? 'bg-purple-100 text-purple-700' :
             'bg-green-100 text-green-700'
-        }`}>{role.charAt(0).toUpperCase() + role.slice(1)}</span>;
+        }`}>{roleText}</span>;
       }
     },
     {
@@ -235,7 +248,7 @@ export default function UserManagementPage() {
             onClose={() => { setIsEditRoleFormOpen(false); setEditingUser(undefined);}}
             user={editingUser}
             onSave={handleEditRoleSubmit}
-            allowedRoles={['doctor', 'patient']} // Admins can change users to 'doctor' or 'patient'
+            allowedRoles={['doctor', 'patient', 'midwife/nurse']} // Admins can change users to these roles
         />
       )}
       
@@ -247,7 +260,7 @@ export default function UserManagementPage() {
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will remove "{userToDelete.name}" ({userToDelete.role}) 
-                from the application's database and their associated health records. 
+                from the application's database and all their associated health records. 
                 Their Firebase Authentication record might remain.
               </AlertDialogDescription>
             </AlertDialogHeader>
