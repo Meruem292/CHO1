@@ -140,7 +140,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
 
   const baseNavItems = [
     { value: 'profile', label: 'Patient Info', icon: User, href: `/patients/${patientId}/profile` },
-    { value: 'consultations', label: 'Consultations', icon: ClipboardList, href: `/patients/${patientId}/consultations`, roles: ['admin', 'doctor'] },
+    { value: 'consultations', label: 'Consultations', icon: ClipboardList, href: `/patients/${patientId}/consultations`, roles: ['admin', 'doctor', 'patient'] },
     { value: 'maternity-history', label: 'Maternity History', icon: Baby, href: `/patients/${patientId}/maternity-history` },
     { value: 'baby-health', label: 'Baby Health', icon: HeartPulse, href: `/patients/${patientId}/baby-health` },
   ];
