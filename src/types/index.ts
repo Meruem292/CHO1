@@ -122,7 +122,7 @@ export interface WorkingDay {
 
 export interface DoctorSchedule {
   id: string; // Corresponds to doctorId (Firebase key)
-  doctorId: string; // doctor's User.id
+  doctorId: string; // provider's User.id
   workingHours: WorkingDay[]; // Array of 7 WorkingDay objects, one for each day
   unavailableDates?: string[]; // Array of "YYYY-MM-DD"
   customAvailableSlots?: Array<{ date: string; startTime: string; endTime: string; slotDurationMinutes?: number }>;
@@ -138,6 +138,7 @@ export type AppointmentStatus =
   | 'cancelledByPatient'
   | 'cancelledByDoctor'
   | 'cancelledByAdmin'
+  | 'cancelledByProvider' // More generic for doctor or midwife
   | 'rescheduled';
 
 export interface Appointment {

@@ -38,7 +38,7 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
     to: new Date(),
   });
 
-  const doctors = useMemo(() => allPatients.filter(p => p.role === 'doctor'), [allPatients]);
+  const providers = useMemo(() => allPatients.filter(p => p.role === 'doctor' || p.role === 'midwife/nurse'), [allPatients]);
   const patients = useMemo(() => allPatients.filter(p => p.role === 'patient'), [allPatients]);
 
   const filteredAppointments = useMemo(() => {
@@ -61,12 +61,12 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
     const cancelled = filteredAppointments.filter(app => app.status.startsWith('cancelled')).length;
     return {
       totalPatients: patients.length,
-      totalDoctors: doctors.length,
+      totalProviders: providers.length,
       futureScheduled,
       completed,
       cancelled,
     };
-  }, [patients, doctors, filteredAppointments]);
+  }, [patients, providers, filteredAppointments]);
 
   const appointmentsByStatusData = useMemo(() => {
     const scheduled = stats.futureScheduled;
@@ -82,14 +82,14 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
     ].filter(item => item.value > 0);
   }, [stats]);
 
-  const appointmentsPerDoctorData = useMemo(() => {
-    return doctors.map(doc => ({
+  const appointmentsPerProviderData = useMemo(() => {
+    return providers.map(doc => ({
       name: doc.name.length > 20 ? doc.name.substring(0, 17) + '...' : doc.name, // Truncate long names
       appointments: filteredAppointments.filter(app => app.doctorId === doc.id).length,
     })).filter(d => d.appointments > 0)
        .sort((a,b) => b.appointments - a.appointments) // Sort by most appointments
-       .slice(0,10); // Limit to top 10 doctors for readability
-  }, [doctors, filteredAppointments]);
+       .slice(0,10); // Limit to top 10 for readability
+  }, [providers, filteredAppointments]);
   
   if (isLoading) {
     return (
@@ -121,7 +121,7 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard title="Total Patients" value={stats.totalPatients} icon={Users} />
-        <StatCard title="Total Doctors" value={stats.totalDoctors} icon={Stethoscope} />
+        <StatCard title="Total Providers" value={stats.totalProviders} icon={Stethoscope} />
         <StatCard title="Scheduled Appointments" value={stats.futureScheduled} icon={CalendarClock} description="Future & Active" />
         <StatCard title="Completed Appointments" value={stats.completed} icon={CheckCircle} />
         <StatCard title="Cancelled Appointments" value={stats.cancelled} icon={XCircle} />
@@ -169,13 +169,13 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
 
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5 text-primary" />Appointments Per Doctor</CardTitle>
-             <CardDescription>Top doctors by appointment volume in the selected period.</CardDescription>
+            <CardTitle className="flex items-center"><BarChart3 className="mr-2 h-5 w-5 text-primary" />Appointments Per Provider</CardTitle>
+             <CardDescription>Top providers by appointment volume in the selected period.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] pt-4">
-          {appointmentsPerDoctorData.length > 0 ? (
+          {appointmentsPerProviderData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={appointmentsPerDoctorData} layout="vertical" margin={{ right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={appointmentsPerProviderData} layout="vertical" margin={{ right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border) / 0.5)" />
                 <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
                 <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={100} interval={0} />
@@ -185,7 +185,7 @@ export function AdminDashboard({ allPatients, allAppointments, isLoading }: Admi
               </BarChart>
             </ResponsiveContainer>
              ) : (
-                 <NoDataAlert type="appointments per doctor" />
+                 <NoDataAlert type="appointments per provider" />
             )}
           </CardContent>
         </Card>

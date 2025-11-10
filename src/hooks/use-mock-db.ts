@@ -312,7 +312,7 @@ export function useMockDb() {
       }
       setDoctorScheduleLoading(false);
     }, (error) => {
-      console.error(`Error fetching schedule for doctor ${doctorId}:`, error);
+      console.error(`Error fetching schedule for provider ${doctorId}:`, error);
       setDoctorSchedule(null);
       setDoctorScheduleLoading(false);
     });
@@ -326,7 +326,7 @@ export function useMockDb() {
       setAllDoctorSchedules(snapshotToArray<DoctorSchedule>(snapshot));
       setAllDoctorSchedulesLoading(false);
     }, (error) => {
-      console.error("Error fetching all doctor schedules:", error);
+      console.error("Error fetching all provider schedules:", error);
       setAllDoctorSchedules([]);
       setAllDoctorSchedulesLoading(false);
     });
@@ -390,7 +390,7 @@ export function useMockDb() {
       setAppointments(records); 
       setAppointmentsLoading(false);
     }, (error) => {
-      console.error(`Error fetching appointments for doctor ${doctorId}:`, error);
+      console.error(`Error fetching appointments for provider ${doctorId}:`, error);
       setAppointments([]);
       setAppointmentsLoading(false);
     });
@@ -431,7 +431,7 @@ export function useMockDb() {
         setDoctorAppointmentsForBooking(records);
         setDoctorAppointmentsLoading(false);
     }, (error) => {
-        console.error(`Error fetching appointments for doctor ${doctorId} (for booking):`, error);
+        console.error(`Error fetching appointments for provider ${doctorId} (for booking):`, error);
         setDoctorAppointmentsForBooking([]);
         setDoctorAppointmentsLoading(false);
     });
@@ -446,7 +446,7 @@ export function useMockDb() {
     const dataToSave: Omit<Appointment, 'id'> = {
       ...appointmentData,
       patientName: patientRec?.name || 'Unknown Patient',
-      doctorName: doctorRec?.name || 'Unknown Doctor',
+      doctorName: doctorRec?.name || 'Unknown Provider',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -481,7 +481,7 @@ export function useMockDb() {
       setDoctorActivityConsultations(doctorConsults);
       setDoctorActivityLoading(false);
     }, (error) => {
-      console.error(`Error fetching consultations for doctor ${doctorId} activity:`, error);
+      console.error(`Error fetching consultations for provider ${doctorId} activity:`, error);
       setDoctorActivityLoading(false);
     });
     return unsubscribe;
@@ -497,7 +497,7 @@ export function useMockDb() {
       setDoctorActivityMaternity(doctorMaternity);
       setDoctorActivityLoading(false);
     }, (error) => {
-      console.error(`Error fetching maternity records for doctor ${doctorId} activity:`, error);
+      console.error(`Error fetching maternity records for provider ${doctorId} activity:`, error);
       setDoctorActivityLoading(false);
     });
     return unsubscribe;
@@ -513,7 +513,7 @@ export function useMockDb() {
       setDoctorActivityBaby(doctorBaby);
       setDoctorActivityLoading(false);
     }, (error) => {
-      console.error(`Error fetching baby records for doctor ${doctorId} activity:`, error);
+      console.error(`Error fetching baby records for provider ${doctorId} activity:`, error);
       setDoctorActivityLoading(false);
     });
     return unsubscribe;

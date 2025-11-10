@@ -130,11 +130,12 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
 
   const handleCancelConfirm = async () => {
     if (!appointmentToCancel || !currentUser) return;
-    const reason = cancellationReason.trim() || (currentUser.role === 'patient' ? 'Cancelled by patient' : (currentUser.role === 'doctor' ? 'Cancelled by doctor' : 'Cancelled by admin'));
+    const roleSuffix = currentUser.role === 'midwife/nurse' ? 'Provider' : (currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1));
+    const reason = cancellationReason.trim() || `Cancelled by ${roleSuffix.toLowerCase()}`;
     try {
-      const roleSuffix = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
-      await updateAppointmentStatus(appointmentToCancel.id, `cancelledBy${roleSuffix}` as AppointmentStatus, currentUser.role, reason);
-      toast({ title: "Appointment Cancelled", description: `The appointment for ${appointmentToCancel.patientName} with Dr. ${appointmentToCancel.doctorName} has been cancelled.` });
+      const statusKey = `cancelledBy${roleSuffix}` as AppointmentStatus;
+      await updateAppointmentStatus(appointmentToCancel.id, statusKey, currentUser.role, reason);
+      toast({ title: "Appointment Cancelled", description: `The appointment for ${appointmentToCancel.patientName} with ${appointmentToCancel.doctorName} has been cancelled.` });
       setAppointmentToCancel(null);
       setCancellationReason('');
     } catch (error) {
@@ -189,7 +190,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     },
     ...(viewingUser?.role === 'patient' ? [{
       accessorKey: 'doctorName',
-      header: 'Doctor',
+      header: 'Provider',
       cell: ({ row }: { row: { original?: Appointment } }) => row.original?.doctorName || 'N/A',
     }] : []),
     ...((viewingUser?.role === 'doctor' || viewingUser?.role === 'midwife/nurse') ? [{
@@ -232,8 +233,6 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
         
         const showCancelButton = canManageThisAppointment(appointment) && appointment.status === 'scheduled' && isFuture(parseISO(appointment.appointmentDateTimeStart));
         const showViewPatientRecordsButton = (currentUser?.role === 'admin' || ((currentUser?.role === 'doctor' || currentUser?.role === 'midwife/nurse') && currentUser.id === viewingUserId)) && (viewingUser?.role === 'doctor' || viewingUser?.role === 'midwife/nurse') && appointment.patientId;
-        // Show Start Consultation button if current user is the doctor for this appointment AND status is 'scheduled' (future or past)
-        // (Can add consultation for past scheduled appointments that were missed)
         const showStartConsultationButton = currentUser?.role === 'doctor' && currentUser.id === appointment.doctorId && appointment.status === 'scheduled';
 
 
@@ -266,7 +265,9 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     },
   ], [viewingUser?.role, currentUser, viewingUserId, addConsultation, updateAppointmentStatus]);
 
-  if (viewingUserLoading || (viewingUser && appointmentsLoading)) {
+  const isLoadingOverall = viewingUserLoading || (viewingUser && appointmentsLoading);
+
+  if (isLoadingOverall) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -311,7 +312,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline">
           {currentUser.id === viewingUserId ? "My Appointments" : `Appointments for ${viewingUser.name}`}
-          {(viewingUser.role === 'doctor' || viewingUser.role === 'midwife/nurse') && currentUser.id !== viewingUserId && ` (${viewingUser.role.charAt(0).toUpperCase() + viewingUser.role.slice(1)})`}
+          {(viewingUser.role === 'doctor' || viewingUser.role === 'midwife/nurse') && currentUser.id !== viewingUserId && ` (${viewingUser.role === 'midwife/nurse' ? 'Midwife/Nurse' : 'Doctor'})`}
           {viewingUser.role === 'patient' && currentUser.id !== viewingUserId && " (Patient)"}
         </h1>
       </div>
@@ -332,7 +333,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
           columns={columns}
           data={userSpecificAppointments}
           filterColumnId="status"
-          filterPlaceholder="Filter by status, patient, doctor..."
+          filterPlaceholder="Filter by status, patient, provider..."
         />
       )}
 
@@ -342,7 +343,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel Appointment?</AlertDialogTitle>
               <AlertDialogDescription>
-                Cancel appointment for {appointmentToCancel.patientName} with Dr. {appointmentToCancel.doctorName} on {formatInPHTime_Combined(appointmentToCancel.appointmentDateTimeStart)}?
+                Cancel appointment for {appointmentToCancel.patientName} with {appointmentToCancel.doctorName} on {formatInPHTime_Combined(appointmentToCancel.appointmentDateTimeStart)}?
                 { currentUser.role !== 'patient' && <span className="block mt-2">Please provide a reason for cancellation.</span>}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -352,7 +353,7 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
                 id="cancellationReason"
                 value={cancellationReason}
                 onChange={(e) => setCancellationReason(e.target.value)}
-                placeholder={currentUser.role === 'patient' ? "Optional reason" : "Reason (e.g., Doctor unavailable)"}
+                placeholder={currentUser.role === 'patient' ? "Optional reason" : "Reason (e.g., Provider unavailable)"}
               />
             </div>
             <AlertDialogFooter>
@@ -385,4 +386,3 @@ export default function UserAppointmentsPage({ params: paramsPromise }: UserAppo
     </div>
   );
 }
-

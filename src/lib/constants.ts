@@ -25,8 +25,8 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['admin'],
   },
   {
-    href: '/doctors', // Admin views/manages all doctors (role='doctor')
-    label: 'Manage Doctors',
+    href: '/doctors', // Admin views/manages all providers (doctors and midwives)
+    label: 'Manage Providers',
     icon: Stethoscope,
     roles: ['admin'],
   },
@@ -43,26 +43,26 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['admin'],
   },
   {
-    href: '/admin/schedules', // Admin manages all doctor schedules
-    label: 'Doctor Schedules',
+    href: '/admin/schedules', // Admin views all provider schedules
+    label: 'Provider Schedules',
     icon: BriefcaseMedical,
     roles: ['admin'],
   },
   // Doctor & Midwife/Nurse Specific
   {
-    href: '/patients', // Doctors view their associated patients
+    href: '/patients', // Providers view their associated patients
     label: 'My Associated Patients',
     icon: Users,
     roles: ['doctor', 'midwife/nurse'],
   },
   {
-    href: '/doctor/my-schedule', // Doctor manages their own schedule
+    href: '/doctor/my-schedule', // Provider manages their own schedule
     label: 'My Schedule',
     icon: CalendarPlus,
     roles: ['doctor', 'midwife/nurse'],
   },
   {
-    href: '/doctor/my-appointments', // Doctor views their own appointments (redirects to /users/[doctorId]/appointments)
+    href: '/doctor/my-appointments', // Provider views their own appointments (redirects)
     label: 'My Appointments',
     icon: CalendarClock,
     roles: ['doctor', 'midwife/nurse'],
@@ -81,7 +81,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   // Patient Specific
   {
-    href: '/patient/my-appointments', // Patient views their own appointments (redirects to /users/[patientId]/appointments)
+    href: '/patient/my-appointments', // Patient views their own appointments (redirects)
     label: 'My Appointments',
     icon: CalendarClock,
     roles: ['patient'],

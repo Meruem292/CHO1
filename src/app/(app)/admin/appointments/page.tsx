@@ -98,7 +98,7 @@ export default function AdminManageAppointmentsPage() {
     },
     {
       accessorKey: 'doctorName',
-      header: 'Doctor',
+      header: 'Provider',
       cell: ({ row }: { row: { original?: Appointment } }) => row.original?.doctorName || 'N/A',
     },
     {
@@ -196,8 +196,8 @@ export default function AdminManageAppointmentsPage() {
         <DataTable
           columns={columns}
           data={allAppointmentsForAdmin}
-          filterColumnId="status"
-          filterPlaceholder="Filter by status, patient, doctor..."
+          filterColumnId="patientName"
+          filterPlaceholder="Filter by patient or provider..."
         />
       )}
 
@@ -207,7 +207,7 @@ export default function AdminManageAppointmentsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel Appointment?</AlertDialogTitle>
               <AlertDialogDescription>
-                Admin: Cancel appointment for {appointmentToCancel.patientName} with Dr. {appointmentToCancel.doctorName} on {formatInPHTime_Combined(appointmentToCancel.appointmentDateTimeStart)}?
+                Admin: Cancel appointment for {appointmentToCancel.patientName} with {appointmentToCancel.doctorName} on {formatInPHTime_Combined(appointmentToCancel.appointmentDateTimeStart)}?
                 Please provide a reason for cancellation.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -230,5 +230,3 @@ export default function AdminManageAppointmentsPage() {
     </div>
   );
 }
-
-    

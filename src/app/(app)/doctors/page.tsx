@@ -33,7 +33,7 @@ import { toast } from '@/hooks/use-toast';
 import { UserFormDialog } from '@/components/dialogs/user-form-dialog';
 import { EditUserRoleDialog } from '@/components/dialogs/edit-user-role-dialog';
 
-export default function DoctorsPage() {
+export default function ProvidersPage() {
   const { user, adminCreateUserWithEmail } = useAuth(); // Get adminCreateUserWithEmail
   const { 
     patients: allUsers, 
@@ -48,8 +48,8 @@ export default function DoctorsPage() {
   const [editingUser, setEditingUser] = useState<Patient | undefined>(undefined);
   const [userToDelete, setUserToDelete] = useState<Patient | null>(null);
 
-  const doctorUsers = useMemo(() => {
-    return allUsers.filter(u => u.role === 'doctor');
+  const providerUsers = useMemo(() => {
+    return allUsers.filter(u => u.role === 'doctor' || u.role === 'midwife/nurse');
   }, [allUsers]);
 
   const handleAddUserSubmit = async (data: AdminCreateUserFormData) => {
@@ -72,14 +72,11 @@ export default function DoctorsPage() {
         data.firstName, 
         data.middleName, 
         data.lastName, 
-        data.role // role from form, should ideally be 'doctor' if adding from this page
+        data.role // role from form
       );
-      // adminCreateUserWithEmail in AuthProvider should handle success toasts.
-      // It will also sign the admin in as the new user, and a toast warns about this.
       setIsAddUserFormOpen(false);
     } catch (error) {
-      console.error("Error adding user from DoctorsPage:", error);
-      // Error toasts are handled by adminCreateUserWithEmail or handleAuthError in AuthProvider
+      console.error("Error adding user from ProvidersPage:", error);
     }
   };
 
@@ -156,8 +153,6 @@ export default function DoctorsPage() {
       id: 'actions',
       cell: ({ row }) => {
         const targetUser = row.original;
-        // Admins cannot edit other admins or themselves from this specific "Doctors" management page.
-        // They can only manage users with 'doctor' role here.
         if (user?.role !== 'admin' || targetUser.role === 'admin' || targetUser.id === user.id) { 
           return null;
         }
@@ -176,7 +171,7 @@ export default function DoctorsPage() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setUserToDelete(targetUser)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete Doctor
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Provider
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -199,11 +194,11 @@ export default function DoctorsPage() {
     );
   }
   
-  if (usersLoading && doctorUsers.length === 0) {
+  if (usersLoading && providerUsers.length === 0) {
     return (
         <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading doctors list...</p>
+            <p className="ml-2">Loading providers list...</p>
         </div>
     );
   }
@@ -212,36 +207,35 @@ export default function DoctorsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold font-headline flex items-center">
-          <Stethoscope className="mr-3 h-8 w-8 text-primary" /> Manage Doctors
+          <Stethoscope className="mr-3 h-8 w-8 text-primary" /> Manage Providers
         </h1>
         <Button onClick={() => setIsAddUserFormOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add User
         </Button>
       </div>
 
-      {doctorUsers.length === 0 && !usersLoading ? (
+      {providerUsers.length === 0 && !usersLoading ? (
         <Alert>
           <Stethoscope className="h-4 w-4" />
-          <AlertTitle>No Doctors Found</AlertTitle>
+          <AlertTitle>No Providers Found</AlertTitle>
           <AlertDescription>
-            There are no users with the 'doctor' role in the system yet. You can add one using the "Add User" button.
+            There are no users with the 'doctor' or 'midwife/nurse' role in the system yet. You can add one using the "Add User" button.
           </AlertDescription>
         </Alert>
       ) : (
         <DataTable
             columns={columns}
-            data={doctorUsers}
+            data={providerUsers}
             filterColumnId="name"
             filterPlaceholder="Filter by name or email..."
         />
       )}
       
-
       <UserFormDialog
         isOpen={isAddUserFormOpen}
         onClose={() => setIsAddUserFormOpen(false)}
         onSubmit={handleAddUserSubmit}
-        defaultRole="doctor" // Default to 'doctor' when adding from this page
+        defaultRole="doctor"
       />
 
       {editingUser && (
@@ -250,11 +244,10 @@ export default function DoctorsPage() {
             onClose={() => { setIsEditRoleFormOpen(false); setEditingUser(undefined);}}
             user={editingUser}
             onSave={handleEditRoleSubmit}
-            allowedRoles={['doctor', 'patient', 'midwife/nurse']} // Doctors can be changed to patient or midwife
+            allowedRoles={['doctor', 'patient', 'midwife/nurse']}
         />
       )}
       
-
       {userToDelete && (
         <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
           <AlertDialogContent>

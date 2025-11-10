@@ -84,14 +84,14 @@ export default function AdminManageSchedulesPage() {
         </h1>
       </div>
       <p className="text-muted-foreground">
-        View the availability schedules for all doctors and midwives.
+        View the availability schedules for all doctors and midwives/nurses.
       </p>
 
       {providersWithSchedule.length === 0 && !isLoading ? (
         <Alert>
           <UserCircle className="h-4 w-4" />
           <AlertTitle>No Providers Found</AlertTitle>
-          <AlertDescription>There are no doctors or midwives in the system to display schedules for.</AlertDescription>
+          <AlertDescription>There are no doctors or midwives/nurses in the system to display schedules for.</AlertDescription>
         </Alert>
       ) : allDoctorSchedules.length === 0 && !isLoading && providersWithSchedule.length > 0 ? (
          <Alert>
