@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
@@ -378,7 +379,7 @@ export default function PatientConsultationsPage({ params: paramsPromise }: Cons
 
       {consultationToView && (
         <Dialog open={!!consultationToView} onOpenChange={() => setConsultationToView(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Doctor's Response</DialogTitle>
               <DialogDescription>
