@@ -28,16 +28,20 @@ function formatTimestamp(timestamp: any): string {
   }
 }
 
-export default function AdminAuditLogPage() {
+export default function AuditLogPage() {
   const { user } = useAuth();
   const { getAuditLogs } = useAudit();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Only admins should fetch the full log
     if (user?.role === 'admin') {
       const unsubscribe = getAuditLogs(200, setLogs, setIsLoading); // Fetch last 200 logs
       return () => unsubscribe();
+    } else {
+      setIsLoading(false);
+      setLogs([]);
     }
   }, [user, getAuditLogs]);
 
@@ -77,20 +81,7 @@ export default function AdminAuditLogPage() {
     },
   ], []);
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="space-y-6">
-        <Alert variant="destructive">
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>You do not have permission to view this page. This page is for administrators only.</AlertDescription>
-        </Alert>
-        <Link href="/dashboard" className="text-primary hover:underline">Go to Dashboard</Link>
-      </div>
-    );
-  }
-
-  if (isLoading && logs.length === 0) {
+  if (isLoading && user?.role === 'admin') {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -114,13 +105,25 @@ export default function AdminAuditLogPage() {
         A chronological record of all significant activities within the application.
       </p>
 
-      {logs.length === 0 && !isLoading ? (
+      {user?.role !== 'admin' && (
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Administrator View</AlertTitle>
+          <AlertDescription>
+            The full audit log is available for administrators only.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {user?.role === 'admin' && logs.length === 0 && !isLoading && (
         <Alert>
           <ListOrdered className="h-4 w-4" />
           <AlertTitle>No Logs Found</AlertTitle>
           <AlertDescription>There are no audit log entries in the system yet.</AlertDescription>
         </Alert>
-      ) : (
+      )}
+      
+      {user?.role === 'admin' && logs.length > 0 && (
         <DataTable
           columns={columns}
           data={logs}
