@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
@@ -214,7 +215,7 @@ export default function PatientBabyHealthPage({ params: paramsPromise }: BabyHea
   ], [user?.role, user?.id]); 
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Baby Health Records for {motherName}'s Child(ren)</h2>
         {(user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'midwife/nurse') && (

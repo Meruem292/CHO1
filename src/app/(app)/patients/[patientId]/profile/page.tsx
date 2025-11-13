@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, use } from 'react';
@@ -150,99 +151,101 @@ export default function PatientProfilePage({ params: paramsPromise }: PatientPro
   // Admin/Provider view: Editable form
   if (canEditProfile && isEditing) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Edit Patient Profile: {patient.name}</span>
-            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isUpdating}>
-              Cancel Edit
-            </Button>
-          </CardTitle>
-          <CardDescription>Update the details for {patient.name}. Physical measurements are managed on the BMI History page.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PatientForm
-            patient={patient}
-            onSubmit={handleUpdatePatient}
-            isLoading={isUpdating}
-            onCancel={() => setIsEditing(false)}
-            isProviderEditing={user?.role === 'doctor' || user?.role === 'midwife/nurse'}
-          />
-        </CardContent>
-      </Card>
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Edit Patient Profile: {patient.name}</span>
+              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isUpdating}>
+                Cancel Edit
+              </Button>
+            </CardTitle>
+            <CardDescription>Update the details for {patient.name}. Physical measurements are managed on the BMI History page.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientForm
+              patient={patient}
+              onSubmit={handleUpdatePatient}
+              isLoading={isUpdating}
+              onCancel={() => setIsEditing(false)}
+              isProviderEditing={user?.role === 'doctor' || user?.role === 'midwife/nurse'}
+            />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   // Default read-only view for everyone, or provider before clicking "Edit"
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Patient Profile Details</span>
-          {canEditProfile && !isEditing && (
-            <Button onClick={() => setIsEditing(true)}>
-              <Edit className="mr-2 h-4 w-4" /> Edit Profile
-            </Button>
-          )}
-        </CardTitle>
-        <CardDescription>Detailed information for {patient.name}.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <InfoItem label="Full Name" value={patient.name} />
-          <InfoItem label="Email" value={patient.email} />
-          <InfoItem label="Phone Number" value={patient.phoneNumber} />
-          <InfoItem label="Date of Birth" value={formatInPHTime_PPP(patient.dateOfBirth)} />
-          <InfoItem label="Sex" value={patient.sex} />
-          <InfoItem label="Civil Status" value={patient.civilStatus} />
-          <InfoItem label="Address" value="Dasmariñas, Cavite" />
-          <InfoItem label="Religion" value={patient.religion} />
-          <InfoItem label="Ethnicity" value={patient.ethnicity} />
-          <InfoItem label="Nationality" value={patient.nationality} />
-        </div>
-        <Separator />
-        <h3 className="text-lg font-medium text-primary">Latest Physical Measurements</h3>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <InfoItem label="Weight" value={lastBmiRecord ? `${lastBmiRecord.weightKg} kg` : 'N/A'} />
-          <InfoItem label="Height" value={lastBmiRecord ? `${lastBmiRecord.heightM} m` : 'N/A'} />
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">BMI</p>
-            {lastBmiRecord ? (
-              <div className="flex items-center space-x-2">
-                <p className="text-md font-semibold">{lastBmiRecord.bmi.toFixed(2)}</p>
-                {bmiInfo && <Badge variant={bmiInfo.variant}>{bmiInfo.category}</Badge>}
-              </div>
-            ) : (
-              <p className="text-md">N/A</p>
+    <div className="p-6">
+        <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+            <span><User className="mr-2 h-6 w-6 text-primary inline-block" />Patient Profile Details</span>
+            {canEditProfile && !isEditing && (
+                <Button onClick={() => setIsEditing(true)}>
+                <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                </Button>
             )}
-          </div>
-        </div>
-        <Separator />
-        <h3 className="text-lg font-medium text-primary">Socio-Economic Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <InfoItem label="Highest Education" value={patient.highestEducation} />
-          <InfoItem label="Occupation" value={patient.occupation} />
-          <InfoItem label="Monthly Income" value={patient.monthlyIncome} />
-        </div>
-        <Separator />
-        <h3 className="text-lg font-medium text-primary">Health & Membership</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <InfoItem label="PhilHealth Member" value={patient.philhealthMember} />
-          <InfoItem label="PhilHealth Number" value={patient.philhealthNumber} />
-          <InfoItem label="Facility Member" value={patient.healthFacilityMember} />
-          <InfoItem label="Household Member" value={patient.householdMember} />
-          <InfoItem label="Blood Type" value={patient.bloodType} />
-        </div>
-        {patient.remarks && (
-          <>
-            <Separator />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Remarks</p>
-              <p className="text-md whitespace-pre-wrap">{patient.remarks}</p>
+            </CardTitle>
+            <CardDescription>Detailed information for {patient.name}.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InfoItem label="Full Name" value={patient.name} />
+            <InfoItem label="Email" value={patient.email} />
+            <InfoItem label="Phone Number" value={patient.phoneNumber} />
+            <InfoItem label="Date of Birth" value={formatInPHTime_PPP(patient.dateOfBirth)} />
+            <InfoItem label="Sex" value={patient.sex} />
+            <InfoItem label="Civil Status" value={patient.civilStatus} />
+            <InfoItem label="Address" value="Dasmariñas, Cavite" />
+            <InfoItem label="Religion" value={patient.religion} />
+            <InfoItem label="Ethnicity" value={patient.ethnicity} />
+            <InfoItem label="Nationality" value={patient.nationality} />
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+            <Separator />
+            <h3 className="text-lg font-medium text-primary">Latest Physical Measurements</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InfoItem label="Weight" value={lastBmiRecord ? `${lastBmiRecord.weightKg} kg` : 'N/A'} />
+            <InfoItem label="Height" value={lastBmiRecord ? `${lastBmiRecord.heightM} m` : 'N/A'} />
+            <div>
+                <p className="text-sm font-medium text-muted-foreground">BMI</p>
+                {lastBmiRecord ? (
+                <div className="flex items-center space-x-2">
+                    <p className="text-md font-semibold">{lastBmiRecord.bmi.toFixed(2)}</p>
+                    {bmiInfo && <Badge variant={bmiInfo.variant}>{bmiInfo.category}</Badge>}
+                </div>
+                ) : (
+                <p className="text-md">N/A</p>
+                )}
+            </div>
+            </div>
+            <Separator />
+            <h3 className="text-lg font-medium text-primary">Socio-Economic Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InfoItem label="Highest Education" value={patient.highestEducation} />
+            <InfoItem label="Occupation" value={patient.occupation} />
+            <InfoItem label="Monthly Income" value={patient.monthlyIncome} />
+            </div>
+            <Separator />
+            <h3 className="text-lg font-medium text-primary">Health & Membership</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InfoItem label="PhilHealth Member" value={patient.philhealthMember} />
+            <InfoItem label="PhilHealth Number" value={patient.philhealthNumber} />
+            <InfoItem label="Facility Member" value={patient.healthFacilityMember} />
+            <InfoItem label="Household Member" value={patient.householdMember} />
+            <InfoItem label="Blood Type" value={patient.bloodType} />
+            </div>
+            {patient.remarks && (
+            <>
+                <Separator />
+                <div>
+                <p className="text-sm font-medium text-muted-foreground">Remarks</p>
+                <p className="text-md whitespace-pre-wrap">{patient.remarks}</p>
+                </div>
+            </>
+            )}
+        </CardContent>
+    </div>
   );
 }

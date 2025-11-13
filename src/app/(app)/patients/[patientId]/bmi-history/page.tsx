@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { use, useEffect, useMemo, useState } from 'react';
@@ -120,7 +121,7 @@ export default function BmiHistoryPage({ params: paramsPromise }: BmiHistoryPage
   }
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6 p-6">
       {canRecordBmi && <BmiRecordingForm onSubmit={handleBmiSubmit} isLoading={isSubmitting} />}
 
       {bmiHistory.length === 0 ? (

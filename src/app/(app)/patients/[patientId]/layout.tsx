@@ -163,7 +163,6 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
         <div className="sm:min-w-[150px]"></div> {/* Spacer for alignment */}
       </div>
 
-
       <Tabs value={activeTab} className="w-full">
         <TabsList className={`grid w-full grid-cols-${navItems.length} mb-6`}>
           {navItems.map(item => (
@@ -174,12 +173,14 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
             </TabsTrigger>
           ))}
         </TabsList>
-        
-        <TabsContent value={activeTab}>
-            {children}
-        </TabsContent>
-
       </Tabs>
+      
+      {/* The content is now rendered outside the Tabs component */}
+      <Card>
+          <CardContent className="p-0">
+             {children}
+          </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, use } from 'react';
@@ -237,7 +238,7 @@ export default function PatientMaternityHistoryPage({ params: paramsPromise }: M
   ], [user?.role, user?.id, openEditMaternityForm, setMaternityRecordToArchive]);
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Maternity History</h2>
          <div className="flex space-x-2">
