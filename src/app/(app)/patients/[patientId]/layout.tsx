@@ -175,8 +175,10 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
           ))}
         </TabsList>
         
-        {/* Children (page.tsx for profile, consultations, etc.) will be rendered here by Next.js routing */}
-        {children}
+        <TabsContent value={activeTab}>
+            {children}
+        </TabsContent>
+
       </Tabs>
     </div>
   );
