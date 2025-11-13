@@ -164,7 +164,7 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
       </div>
 
       <Tabs value={activeTab} className="w-full">
-        <TabsList className={`grid w-full grid-cols-${navItems.length} mb-6`}>
+        <TabsList className="mb-6">
           {navItems.map(item => (
             <TabsTrigger value={item.value} key={item.value} asChild>
               <Link href={item.href} className="flex items-center justify-center gap-2">
@@ -175,7 +175,6 @@ export default function PatientDetailLayout({ children, params: paramsPromise }:
         </TabsList>
       </Tabs>
       
-      {/* The content is now rendered outside the Tabs component */}
       <Card>
           <CardContent className="p-0">
              {children}
