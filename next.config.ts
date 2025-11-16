@@ -5,8 +5,12 @@ import type {NextConfig} from 'next';
 // We need to log the hostname to the console so that we can add it to the
 // list of authorized domains in the Firebase console.
 if (process.env.HOSTNAME) {
-  console.log(`INFO: Development server hostname is: ${process.env.HOSTNAME}`);
-  console.log(`INFO: To fix 'auth/unauthorized-domain' errors, add this domain to the Firebase console's list of authorized domains.`);
+  console.log(`
+[INFO] Firebase Development Environment Detected
+[INFO] Hostname: ${process.env.HOSTNAME}
+[ACTION REQUIRED] To enable Firebase Authentication (including Google/Facebook sign-in), you MUST add the hostname above to the list of authorized domains in your Firebase project's settings.
+[INFO] Go to Firebase Console > Authentication > Settings > Authorized domains > Add domain.
+  `);
 }
 
 
