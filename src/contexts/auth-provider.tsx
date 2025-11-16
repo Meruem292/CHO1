@@ -16,6 +16,7 @@ import {
   type User as FirebaseUser,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth, database } from '@/lib/firebase-config'; // Import Firebase auth and database instances
 import { ref as dbRef, set, get, update, serverTimestamp } from 'firebase/database'; // Firebase RTDB functions
@@ -30,6 +31,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   isLoading: boolean;
   bootstrapAdminUser?: (config: AdminBootstrapConfig) => Promise<void>;
 }
@@ -180,6 +182,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       description = "Invalid email or password. Please check your credentials and try again.";
     } else if (error.code === 'auth/email-already-in-use') {
       description = "This email address is already in use by another account.";
+    } else if (error.code === 'auth/user-not-found') {
+      description = "No user found with this email address.";
     }
     // Add more specific error messages as needed
 
@@ -240,10 +244,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-        // Since re-authenticating with a prompt is problematic, we'll proceed assuming the admin's current session is valid.
-        // The more robust solution for sensitive operations would involve a dedicated backend function,
-        // but for this client-side approach, we'll simplify it to avoid the prompt.
-
         // Temporarily sign out the admin to use createUserWithEmailAndPassword
         await signOut(auth);
         
@@ -267,28 +267,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             createdAt: serverTimestamp(),
         });
         
-        // We can't create an audit log here as the admin is signed out.
-        // It's a trade-off of this client-side only approach.
         toast({ title: "User Created Successfully", description: `${finalDisplayName} (${role}) has been created. Re-logging admin...` });
 
-        // IMPORTANT: Sign the admin back in. We can't use a password here. We need to re-establish the session.
-        // This is tricky. The simplest way is to force a re-login.
-        // For a better UX, we'd use custom tokens from a backend.
-        // Given the constraints, we'll just log the admin back in if we have credentials.
-        // Let's assume the user object is still available from the hook's closure.
-         if (user.email) {
-            router.push('/login'); // Force admin to log back in for security.
-            toast({ title: "Please Log In Again", description: "For security, please log back into your admin account." });
-        }
-
+        // IMPORTANT: The admin must log back in. This is a trade-off of the client-side approach.
+        router.push('/login'); 
+        toast({ title: "Please Log In Again", description: "For security, please log back into your admin account." });
 
     } catch (error: any) {
-        // If something fails, try to sign the admin back in
-        if (auth.currentUser === null && user.email) {
-             // This is a best-effort, might not work if credentials are not available
-             // router.push('/login');
-        }
         handleAuthError(error);
+        // Attempt to restore admin session if creation fails, though redirect is safer.
+        router.push('/login');
     } finally {
         setIsLoading(false);
     }
@@ -342,6 +330,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router, user]);
 
+  const sendPasswordReset = useCallback(async (email: string) => {
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${email}, a password reset link has been sent.`,
+      });
+    } catch (error) {
+      handleAuthError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const bootstrapAdminUser = useCallback(async (config: AdminBootstrapConfig) => {
     setIsLoading(true);
     try {
@@ -376,7 +379,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, adminCreateUserWithEmail, loginWithGoogle, loginWithFacebook, logout, isLoading, bootstrapAdminUser }}>
+    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, adminCreateUserWithEmail, loginWithGoogle, loginWithFacebook, logout, sendPasswordReset, isLoading, bootstrapAdminUser }}>
       {children}
     </AuthContext.Provider>
   );

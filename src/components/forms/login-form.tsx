@@ -1,10 +1,10 @@
 
 'use client';
 
+import React, { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
-import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +22,20 @@ import { loginSchema } from '@/zod-schemas';
 import { GoogleLogo } from '@/components/icons/google-logo';
 import { FacebookLogo } from '@/components/icons/facebook-logo';
 import { toast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ForgotPasswordForm } from './forgot-password-form';
+
 
 export function LoginForm() {
   const { loginWithEmail, loginWithGoogle, loginWithFacebook, isLoading } = useAuth();
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -49,91 +60,104 @@ export function LoginForm() {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="flex items-center justify-between">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
-            name="rememberMe"
+            name="email"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+              <FormItem>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={isLoading}
-                  />
+                  <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                 </FormControl>
-                <FormLabel className="text-sm font-normal">
-                  Remember me
-                </FormLabel>
+                <FormMessage />
               </FormItem>
             )}
           />
-          <Link href="#" className="text-sm text-primary hover:underline">
-            Forgot password?
-          </Link>
-        </div>
-        <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
-          {isLoading ? 'Logging in...' : 'Login'}
-        </Button>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="flex items-center justify-between">
+            <FormField
+              control={form.control}
+              name="rememberMe"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal">
+                    Remember me
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+            <DialogTrigger asChild>
+                <Button variant="link" size="sm" className="p-0 h-auto text-sm">
+                    Forgot password?
+                </Button>
+            </DialogTrigger>
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Or</span>
-          </div>
-        </div>
+          <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
+            {isLoading ? 'Logging in...' : 'Login'}
+          </Button>
 
-        <Button
-          variant="outline"
-          className="w-full"
-          type="button"
-          onClick={() => handleSocialLogin('Google')}
-          disabled={isLoading}
-        >
-          <GoogleLogo className="mr-2 h-5 w-5" />
-          {isLoading ? 'Processing...' : 'Sign-In via Google'}
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full"
-          type="button"
-          onClick={() => handleSocialLogin('Facebook')}
-          disabled={isLoading}
-        >
-          <FacebookLogo className="mr-2 h-5 w-5" />
-          {isLoading ? 'Processing...' : 'Sign-In via Facebook'}
-        </Button>
-      </form>
-    </Form>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or</span>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            type="button"
+            onClick={() => handleSocialLogin('Google')}
+            disabled={isLoading}
+          >
+            <GoogleLogo className="mr-2 h-5 w-5" />
+            {isLoading ? 'Processing...' : 'Sign-In via Google'}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            type="button"
+            onClick={() => handleSocialLogin('Facebook')}
+            disabled={isLoading}
+          >
+            <FacebookLogo className="mr-2 h-5 w-5" />
+            {isLoading ? 'Processing...' : 'Sign-In via Facebook'}
+          </Button>
+        </form>
+      </Form>
+      <DialogContent>
+         <DialogHeader>
+            <DialogTitle>Forgot Your Password?</DialogTitle>
+            <DialogDescription>
+                No problem. Enter your email address below and we'll send you a link to reset it.
+            </DialogDescription>
+        </DialogHeader>
+        <ForgotPasswordForm onSuccess={() => setIsForgotPasswordOpen(false)} />
+      </DialogContent>
+    </>
   );
 }
