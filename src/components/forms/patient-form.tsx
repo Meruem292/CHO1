@@ -28,8 +28,13 @@ import { format, parseISO } from 'date-fns';
 const PH_TIMEZONE = 'Asia/Manila';
 
 function formatInPHTime_PPP(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  if (!date) return 'N/A';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return new Intl.DateTimeFormat('en-US', { timeZone: PH_TIMEZONE, year: 'numeric', month: 'short', day: 'numeric' }).format(d);
+  } catch (e) {
+    return 'Invalid Date';
+  }
 }
 
 interface PatientFormProps {
