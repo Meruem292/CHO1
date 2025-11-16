@@ -64,16 +64,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const appUser = mapFirebaseUserToAppUser(firebaseUser, userRole, userName);
           setUser(appUser);
         } else {
-          // User exists in Auth, but not in RTDB (e.g., manual deletion of RTDB record or incomplete signup)
-          // This is a critical misconfiguration.
-          console.error(`User ${firebaseUser.uid} authenticated but no database record found in /patients. Signing out.`);
-          toast({
-            variant: "destructive",
-            title: "Account Configuration Error",
-            description: "Your account is not fully set up. Please contact support or try signing up again.",
+          // User exists in Auth, but not in RTDB. Let's create the record to self-heal.
+          console.warn(`User ${firebaseUser.uid} authenticated but no database record found. Creating one now.`);
+          const constructedName = firebaseUser.displayName || firebaseUser.email || 'User';
+          
+          await set(patientRecordRef, {
+            name: constructedName,
+            email: firebaseUser.email || '',
+            role: 'patient', // Default to patient for self-healed accounts
+            createdAt: serverTimestamp(),
           });
-          await signOut(auth); // Sign out the user
-          setUser(null);
+          
+          const appUser = mapFirebaseUserToAppUser(firebaseUser, 'patient', constructedName);
+          setUser(appUser);
         }
       } else {
         setUser(null);
