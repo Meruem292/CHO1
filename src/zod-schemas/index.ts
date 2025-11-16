@@ -16,6 +16,9 @@ export const signupSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  terms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Terms and Conditions." }),
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"], // path of error
@@ -37,9 +40,7 @@ export const patientFormDataSchema = z.object({
   middleName: z.string().max(50, { message: "Middle name is too long."}).optional().default(''),
   lastName: z.string().min(1, { message: "Last name is required." }).max(50, { message: "Last name is too long."}),
   dateOfBirth: z.string()
-    .optional()
-    .default('')
-    .refine(date => date === '' || !isNaN(Date.parse(date)), { message: "Invalid date format." }),
+    .refine(date => date === '' || !isNaN(Date.parse(date)), { message: "Invalid date format." }).optional(),
   email: z.string().email({ message: "Please enter a valid email address." }),
   phoneNumber: z.string().min(5, { message: "Contact information is too short." }).optional().default(''),
   city: z.string().optional().default(''),

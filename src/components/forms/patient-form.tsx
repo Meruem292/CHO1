@@ -59,8 +59,8 @@ const formStructure = [
     fields: [
       { name: 'phoneNumber', label: 'Phone Number (Optional)', placeholder: '09xxxxxxxxx' },
       { name: 'email', label: 'Email Address', placeholder: 'juan@example.com' },
-      { name: 'city', label: 'City', placeholder: 'Dasmariñas' },
-      { name: 'province', label: 'Province', placeholder: 'Cavite' },
+      { name: 'city', label: 'City', placeholder: 'Dasmariñas', disabled: true },
+      { name: 'province', label: 'Province', placeholder: 'Cavite', disabled: true },
     ]
   },
   {
@@ -140,55 +140,56 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
-        <FormField
-          control={form.control}
-          name="dateOfBirth"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Date of Birth</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                      disabled={isLoading}
-                    >
-                      {field.value ? (
-                        formatInPHTime_PPP(field.value)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value ? parseISO(field.value) : undefined}
-                    onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : '')}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+        
         {formStructure.map((section, sectionIndex) => {
-          if (section.providerOnly && !isProviderEditing) return null;
           return (
             <div key={sectionIndex} className="space-y-4">
               <h3 className="text-lg font-medium text-primary">{section.sectionTitle}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+               {section.sectionTitle === 'Personal Information' && (
+                 <FormField
+                    control={form.control}
+                    name="dateOfBirth"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Date of Birth</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                disabled={isLoading}
+                              >
+                                {field.value ? (
+                                  formatInPHTime_PPP(field.value)
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? parseISO(field.value) : undefined}
+                              onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : '')}
+                              disabled={(date) =>
+                                date > new Date() || date < new Date("1900-01-01")
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+               )}
                 {section.fields.map((fieldConfig) => (
                   <FormField
                     key={fieldConfig.name}
@@ -220,8 +221,8 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
                                 type={fieldConfig.type || 'text'}
                                 placeholder={fieldConfig.placeholder}
                                 {...field}
-                                value={field.value ?? ''} // Handle null/undefined for input value
-                                disabled={isLoading || fieldConfig.name === 'city' || fieldConfig.name === 'province'}
+                                value={(field.value as string | number) ?? ''}
+                                disabled={isLoading || fieldConfig.disabled}
                               />
                           </FormControl>
                         )}

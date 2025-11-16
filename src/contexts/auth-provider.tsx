@@ -14,6 +14,8 @@ import {
   FacebookAuthProvider,
   signInWithPopup,
   type User as FirebaseUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { auth, database } from '@/lib/firebase-config'; // Import Firebase auth and database instances
 import { ref as dbRef, set, get, update, serverTimestamp } from 'firebase/database'; // Firebase RTDB functions
@@ -64,8 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const appUser = mapFirebaseUserToAppUser(firebaseUser, userRole, userName);
           setUser(appUser);
         } else {
-          // User exists in Auth, but not in RTDB. Let's create the record to self-heal.
-          console.warn(`User ${firebaseUser.uid} authenticated but no database record found. Creating one now.`);
+           console.warn(`User ${firebaseUser.uid} authenticated but no database record found. Creating one now.`);
           const constructedName = firebaseUser.displayName || firebaseUser.email || 'User';
           
           await set(patientRecordRef, {
@@ -171,7 +172,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.error("Firebase Auth Error:", error.code, error.message);
     let description = error.message || "An unknown error occurred.";
 
-    if (error.code === 'auth/invalid-credential' || 
+    if (error.code === 'auth/unauthorized-domain') {
+       description = "This domain is not authorized for authentication. Please contact support.";
+    } else if (error.code === 'auth/invalid-credential' || 
         error.code === 'auth/user-not-found' || 
         error.code === 'auth/wrong-password') {
       description = "Invalid email or password. Please check your credentials and try again.";
@@ -222,31 +225,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
 
   const adminCreateUserWithEmail = useCallback(async (email: string, password: string, firstName: string, middleName: string | undefined, lastName: string, role: UserRole) => {
+    if (!user || user.role !== 'admin' || !user.email) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "Only admins can create users." });
+      return;
+    }
     setIsLoading(true);
-    // This creates a temporary auth instance problem if not handled properly.
-    // Best to use Admin SDK for this. For client-side, it will sign in as the new user.
+    
+    // Store admin credentials
+    const adminEmail = user.email;
+    const adminPassword = prompt("Please re-enter your admin password to confirm user creation:");
+    if (!adminPassword) {
+        toast({ variant: "destructive", title: "Action Cancelled", description: "Admin password not provided." });
+        setIsLoading(false);
+        return;
+    }
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      const nameParts = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean);
-      const constructedDisplayName = nameParts.join(' ');
-      const finalDisplayName = constructedDisplayName || userCredential.user.email || 'User';
+        // Reauthenticate admin to get fresh credentials
+        const credential = EmailAuthProvider.credential(adminEmail, adminPassword);
+        await reauthenticateWithCredential(auth.currentUser!, credential);
 
-      await updateProfile(userCredential.user, { displayName: finalDisplayName });
-      
-      // Pass the intended role explicitly when admin creates a user
-      await handleAuthSuccess(userCredential.user, finalDisplayName, role);
+        // Create the new user
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
 
-      toast({ title: "User Created", description: `${finalDisplayName} (${role}) has been created.` });
-      
-      if (user?.role === 'admin') {
-         toast({ title: "Session Changed", description: "You are now signed in as the new user. Please log out and log back in as admin if needed."});
-      }
+        const nameParts = [firstName.trim(), middleName?.trim(), lastName.trim()].filter(Boolean);
+        const finalDisplayName = nameParts.join(' ') || newUser.email || 'User';
 
-    } catch (error) {
-      handleAuthError(error);
+        await updateProfile(newUser, { displayName: finalDisplayName });
+
+        // Create DB record for the new user
+        await set(dbRef(database, `patients/${newUser.uid}`), {
+            name: finalDisplayName,
+            email: newUser.email || '',
+            role: role,
+            firstName,
+            middleName: middleName || '',
+            lastName,
+            createdAt: serverTimestamp(),
+        });
+        
+        await createAuditLog(user, 'user_created', `Admin created user account for ${finalDisplayName} with role ${role}`, newUser.uid, 'user');
+        toast({ title: "User Created Successfully", description: `${finalDisplayName} (${role}) has been created.` });
+
+        // IMPORTANT: Sign the admin back in
+        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+
+    } catch (error: any) {
+        if (error.code === 'auth/wrong-password') {
+             toast({ variant: "destructive", title: "Admin Authentication Failed", description: "Incorrect admin password. User creation cancelled." });
+        } else {
+            handleAuthError(error);
+        }
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   }, [user, router]); // Added router to dependency array
 

@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAuth } from '@/hooks/use-auth-hook';
 
 
 interface UserFormDialogProps {
@@ -43,7 +44,7 @@ interface UserFormDialogProps {
 
 
 export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patient' }: UserFormDialogProps) {
-  const [isSaving, setIsSaving] = useState(false);
+  const { isLoading } = useAuth(); // Use isLoading from auth context
 
   const form = useForm<AdminCreateUserFormData>({
     resolver: zodResolver(adminCreateUserSchema),
@@ -68,22 +69,12 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
         role: defaultRole,
       });
     }
-  }, [isOpen, defaultRole, form.reset]);
+  }, [isOpen, defaultRole, form]);
 
 
   const handleFormSubmit = async (data: AdminCreateUserFormData) => {
-    setIsSaving(true);
-    try {
-      await onSubmit(data); // Pass the full AdminCreateUserFormData
-      // Parent component's onSubmit (which calls adminCreateUserWithEmail) will handle toasts.
-      // It may also handle closing the dialog or navigating, so onClose here might be conditional.
-      onClose(); // Close dialog after successful submission by parent
-    } catch (error) {
-      console.error("Error submitting user form in dialog:", error);
-      // Error toast likely handled by parent or adminCreateUserWithEmail
-    } finally {
-      setIsSaving(false);
-    }
+    await onSubmit(data);
+    onClose();
   };
 
   return (
@@ -104,7 +95,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                 <FormItem>
                   <FormLabel>First Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Juan" {...field} disabled={isSaving} />
+                    <Input placeholder="Juan" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,7 +108,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                 <FormItem>
                   <FormLabel>Middle Name (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Rizal" {...field} disabled={isSaving} />
+                    <Input placeholder="Rizal" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +121,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                 <FormItem>
                   <FormLabel>Last Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Dela Cruz" {...field} disabled={isSaving} />
+                    <Input placeholder="Dela Cruz" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -143,7 +134,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="user@example.com" {...field} disabled={isSaving} />
+                    <Input type="email" placeholder="user@example.com" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,7 +147,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled={isSaving} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -168,7 +159,7 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
@@ -185,11 +176,11 @@ export function UserFormDialog({ isOpen, onClose, onSubmit, defaultRole = 'patie
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving || !form.formState.isValid}>
-                {isSaving ? 'Creating User...' : 'Create User'}
+              <Button type="submit" disabled={isLoading || !form.formState.isValid}>
+                {isLoading ? 'Creating User...' : 'Create User'}
               </Button>
             </DialogFooter>
           </form>

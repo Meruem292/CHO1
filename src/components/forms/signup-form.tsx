@@ -4,17 +4,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type * as z from 'zod';
-
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/use-auth-hook';
 import { signupSchema } from '@/zod-schemas';
 import { GoogleLogo } from '@/components/icons/google-logo';
@@ -32,6 +34,7 @@ export function SignupForm() {
       email: '',
       password: '',
       confirmPassword: '',
+      terms: false,
     },
   });
 
@@ -130,6 +133,33 @@ export function SignupForm() {
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="terms"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isLoading}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Accept terms and conditions
+                </FormLabel>
+                <FormDescription>
+                  You agree to our <Link href="#" className="text-primary hover:underline">Terms of Service</Link> and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.
+                </FormDescription>
+                 <FormMessage />
+              </div>
+            </FormItem>
+          )}
+        />
+
+
         <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
           {isLoading ? 'Signing up...' : 'Sign Up'}
         </Button>
@@ -167,4 +197,3 @@ export function SignupForm() {
     </Form>
   );
 }
-
