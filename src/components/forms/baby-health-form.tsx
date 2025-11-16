@@ -20,7 +20,7 @@ import { CalendarIcon, Save } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parse, parseISO, isValid } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -75,24 +75,28 @@ export function BabyHealthForm({ record, onSubmit, onCancel }: BabyHealthFormPro
             <FormItem className="flex flex-col">
               <FormLabel>Birth Date</FormLabel>
                <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      {field.value ? (
-                        formatInPHTime_PPP(field.value)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
+                <div className="relative flex items-center">
+                    <FormControl>
+                        <Input
+                        placeholder="YYYY-MM-DD"
+                        value={field.value ? format(parseISO(field.value), "yyyy-MM-dd") : ""}
+                        onChange={(e) => {
+                            const date = parse(e.target.value, "yyyy-MM-dd", new Date());
+                            if (isValid(date)) {
+                            field.onChange(format(date, "yyyy-MM-dd"));
+                            } else {
+                            field.onChange(e.target.value);
+                            }
+                        }}
+                        className="pr-10"
+                        />
+                    </FormControl>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute right-1 h-8 w-8">
+                            <CalendarIcon className="h-4 w-4" />
+                        </Button>
+                    </PopoverTrigger>
+                </div>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
@@ -160,3 +164,5 @@ export function BabyHealthForm({ record, onSubmit, onCancel }: BabyHealthFormPro
     </Form>
   );
 }
+
+    

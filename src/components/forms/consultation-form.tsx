@@ -24,7 +24,7 @@ import { Calendar } from '../ui/calendar';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parse, parseISO, isValid } from 'date-fns';
 import { useMockDb } from '@/hooks/use-mock-db'; // To fetch babies
 
 const PH_TIMEZONE = 'Asia/Manila';
@@ -208,31 +208,35 @@ export function ConsultationForm({
             <FormItem className="flex flex-col">
               <FormLabel>Consultation Date</FormLabel>
                <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                      disabled={isRespondingToPatient}
-                    >
-                      {field.value ? (
-                        formatInPHTime_PPP(field.value)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
+                  <div className="relative flex items-center">
+                    <FormControl>
+                        <Input
+                        placeholder="YYYY-MM-DD"
+                        value={field.value ? format(parseISO(field.value), "yyyy-MM-dd") : ""}
+                        onChange={(e) => {
+                            const date = parse(e.target.value, "yyyy-MM-dd", new Date());
+                            if (isValid(date)) {
+                            field.onChange(format(date, "yyyy-MM-dd"));
+                            } else {
+                            field.onChange(e.target.value);
+                            }
+                        }}
+                        disabled={isRespondingToPatient}
+                        className="pr-10"
+                        />
+                    </FormControl>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute right-1 h-8 w-8" disabled={isRespondingToPatient}>
+                            <CalendarIcon className="h-4 w-4" />
+                        </Button>
+                    </PopoverTrigger>
+                  </div>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={field.value ? parseISO(field.value) : undefined}
                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : '')}
-                    disabled={(date) => date > new Date()}
+                    disabled={(date) => date > new Date() || isRespondingToPatient}
                     initialFocus
                   />
                 </PopoverContent>
@@ -301,3 +305,4 @@ export function ConsultationForm({
   );
 }
 
+    

@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parse, parseISO, isValid } from 'date-fns';
 
 const PH_TIMEZONE = 'Asia/Manila';
 
@@ -118,7 +118,6 @@ const getInitialFormValues = (patient?: Patient): PatientFormData => {
     householdMember: patient?.householdMember || undefined,
     bloodType: patient?.bloodType || '',
     remarks: patient?.remarks || '',
-    // weightKg and heightM are removed from here
   };
 };
 
@@ -159,25 +158,29 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
                       <FormItem className="flex flex-col">
                         <FormLabel>Date of Birth</FormLabel>
                         <Popover>
-                          <PopoverTrigger asChild>
+                          <div className="relative flex items-center">
                             <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
+                                <Input
+                                placeholder="YYYY-MM-DD"
+                                value={field.value ? format(parseISO(field.value), "yyyy-MM-dd") : ""}
+                                onChange={(e) => {
+                                    const date = parse(e.target.value, "yyyy-MM-dd", new Date());
+                                    if (isValid(date)) {
+                                    field.onChange(format(date, "yyyy-MM-dd"));
+                                    } else {
+                                    field.onChange(e.target.value); // Keep invalid input for validation to catch
+                                    }
+                                }}
                                 disabled={isLoading}
-                              >
-                                {field.value ? (
-                                  formatInPHTime_PPP(field.value)
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
+                                className="pr-10"
+                                />
                             </FormControl>
-                          </PopoverTrigger>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="absolute right-1 h-8 w-8" disabled={isLoading}>
+                                    <CalendarIcon className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                          </div>
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
@@ -187,6 +190,9 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
                                 date > new Date() || date < new Date("1900-01-01")
                               }
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1900}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -256,3 +262,5 @@ export function PatientForm({ patient, onSubmit, onCancel, isLoading = false, is
     </Form>
   );
 }
+
+    
