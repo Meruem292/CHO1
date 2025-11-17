@@ -194,6 +194,7 @@ export type AuditLogAction =
   | 'user_deleted' // This is now 'archive'
   | 'user_login'
   | 'user_logout'
+  | 'database_backup_downloaded'
   | 'patient_record_created'
   | 'patient_record_updated'
   | 'patient_record_archived'

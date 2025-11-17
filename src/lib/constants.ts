@@ -1,7 +1,7 @@
 
 
 import type { NavItem, UserRole } from '@/types';
-import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History, ListOrdered, Archive, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Baby, HeartPulse, Sparkles, Stethoscope, UserCog, CalendarClock, CalendarPlus, BriefcaseMedical, History, ListOrdered, Archive, TrendingUp, Database } from 'lucide-react';
 
 export const USER_ROLES: UserRole[] = ['admin', 'doctor', 'midwife/nurse', 'patient'];
 
@@ -58,6 +58,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/audit-log',
     label: 'Audit Log',
     icon: ListOrdered,
+    roles: ['admin'],
+  },
+  {
+    href: '/admin/backup',
+    label: 'Backup & Restore',
+    icon: Database,
     roles: ['admin'],
   },
   // Doctor & Midwife/Nurse Specific

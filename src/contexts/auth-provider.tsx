@@ -32,6 +32,7 @@ interface AuthContextType {
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  reauthenticateWithPassword: (password: string) => Promise<boolean>;
   isLoading: boolean;
   bootstrapAdminUser?: (config: AdminBootstrapConfig) => Promise<void>;
 }
@@ -184,6 +185,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       description = "This email address is already in use by another account.";
     } else if (error.code === 'auth/user-not-found') {
       description = "No user found with this email address.";
+    } else if (error.code === 'auth/requires-recent-login') {
+       description = "This is a sensitive operation and requires recent authentication. Please log out and log back in before trying again.";
     }
     // Add more specific error messages as needed
 
@@ -376,10 +379,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   }, [router]); // Added router to dependency array
+  
+  const reauthenticateWithPassword = useCallback(async (password: string): Promise<boolean> => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || !firebaseUser.email) {
+      handleAuthError({ message: 'No authenticated user found for re-authentication.' });
+      return false;
+    }
+    setIsLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(firebaseUser.email, password);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      toast({ title: "Re-authentication Successful", description: "Security check passed." });
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      handleAuthError(error);
+      setIsLoading(false);
+      return false;
+    }
+  }, []);
 
 
   return (
-    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, adminCreateUserWithEmail, loginWithGoogle, loginWithFacebook, logout, sendPasswordReset, isLoading, bootstrapAdminUser }}>
+    <AuthContext.Provider value={{ user, loginWithEmail, signupWithEmail, adminCreateUserWithEmail, loginWithGoogle, loginWithFacebook, logout, sendPasswordReset, reauthenticateWithPassword, isLoading, bootstrapAdminUser }}>
       {children}
     </AuthContext.Provider>
   );
