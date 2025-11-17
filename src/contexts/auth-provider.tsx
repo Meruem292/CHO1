@@ -304,6 +304,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithFacebook = useCallback(() => {
     const provider = new FacebookAuthProvider();
+    provider.addScope('email');
     return loginWithProvider(provider);
   }, [loginWithProvider]);
 
