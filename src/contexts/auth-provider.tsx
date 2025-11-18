@@ -240,21 +240,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
 
+    const adminUser = auth.currentUser;
+    if (!adminUser) {
+        toast({ variant: "destructive", title: "Authentication Error", description: "Admin user not found. Please log in again." });
+        setIsLoading(false);
+        return;
+    }
+
     try {
-        console.warn("Simulating user creation. In a real app, use a server-side function for this.");
-
-        toast({
-            title: "Simulation Complete",
-            description: "User creation simulated. In a production app, this would be handled by a backend function to avoid security risks and session conflicts. A real user was not created in Firebase Auth.",
-            duration: 10000,
-        });
-
-        // We can still create the database record to simulate the UI flow.
-        const fakeUserId = `simulated_${Date.now()}`;
+        // Create the new user
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
         const finalDisplayName = [firstName, middleName, lastName].filter(Boolean).join(' ');
 
-        await set(dbRef(database, `patients/${fakeUserId}`), {
-            id: fakeUserId,
+        // Update new user's profile
+        await updateProfile(newUser, { displayName: finalDisplayName });
+
+        // Create the database record for the new user
+        await set(dbRef(database, `patients/${newUser.uid}`), {
+            id: newUser.uid,
             name: finalDisplayName,
             email: email,
             role: role,
@@ -263,17 +267,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             lastName,
             createdAt: serverTimestamp(),
         });
+
+        toast({
+            title: "User Created Successfully",
+            description: `${finalDisplayName} has been added with the role of ${role}.`,
+        });
+
+        // Log the audit action
+        await createAuditLog(user, 'user_created', `Created user ${finalDisplayName} with role ${role}`, newUser.uid, 'user');
         
-         await createAuditLog(user, 'user_created', `(Simulated) Created user ${finalDisplayName}`, fakeUserId, 'user');
-        
-        setIsLoading(false);
+        // IMPORTANT: Re-authenticate the admin user.
+        // Creating a new user with email/password on the client signs out the current user.
+        // We need to sign the admin back in. We will reuse the login function for this.
+        if (adminUser.email) {
+            // This is a simplified re-login. A more robust solution might store admin credentials securely.
+            // For now, we cannot get the admin's password. We will log them out and force a manual re-login.
+            await signOut(auth);
+            setUser(null);
+            router.push('/login');
+            toast({
+                title: "Admin Session Ended",
+                description: "For security, you have been logged out after creating a new user. Please log in again.",
+                duration: 10000,
+            });
+        }
 
     } catch (error) {
+        // If user creation fails, the admin should still be logged in.
         handleAuthError(error);
     } finally {
         setIsLoading(false);
     }
-}, [user]);
+}, [user, router]);
 
 
   const loginWithProvider = useCallback(async (provider: GoogleAuthProvider | FacebookAuthProvider) => {
