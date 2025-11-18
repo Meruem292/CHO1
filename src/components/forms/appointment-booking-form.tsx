@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -67,6 +68,9 @@ export function AppointmentBookingForm({
                   disabled={isLoading}
                 />
               </FormControl>
+              <FormDescription>
+                Providing symptoms and reasons will help the doctor to have a pre-understanding of the appointment's purpose and your condition.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
