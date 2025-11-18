@@ -11,26 +11,23 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const PreDiagnosisInputSchema = z.object({
+const PreDiagnosisInputSchema = z.object({
   reasonForVisit: z.string().describe('The reason for the patient\'s visit, including symptoms and concerns.'),
 });
 export type PreDiagnosisInput = z.infer<typeof PreDiagnosisInputSchema>;
 
-export const PreDiagnosisOutputSchema = z.object({
+const PreDiagnosisOutputSchema = z.object({
     possibleConditions: z.array(z.string()).describe('A list of possible medical conditions based on the patient\'s stated reason for visit. This is not a diagnosis.'),
     suggestedActions: z.array(z.string()).describe('A list of suggested actions or questions for the medical provider to consider during the consultation.'),
 }).describe('An AI-generated pre-diagnosis analysis.');
 export type PreDiagnosisOutput = z.infer<typeof PreDiagnosisOutputSchema>;
 
 export async function getPreDiagnosis(input: PreDiagnosisInput): Promise<PreDiagnosisOutput> {
-  return preDiagnosisFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'preDiagnosisPrompt',
-  input: {schema: PreDiagnosisInputSchema},
-  output: {schema: PreDiagnosisOutputSchema},
-  prompt: `You are an expert medical triage AI assistant for a City Health Office.
+  const prompt = ai.definePrompt({
+    name: 'preDiagnosisPrompt',
+    input: {schema: PreDiagnosisInputSchema},
+    output: {schema: PreDiagnosisOutputSchema},
+    prompt: `You are an expert medical triage AI assistant for a City Health Office.
   Your role is to provide a preliminary analysis of a patient's stated reason for an appointment. This is NOT a diagnosis.
   You are providing suggestions to a qualified medical professional (doctor, midwife, or nurse).
 
@@ -47,19 +44,22 @@ const prompt = ai.definePrompt({
 
   Format your response as a JSON object matching the output schema.
   `,
-});
+  });
 
-const preDiagnosisFlow = ai.defineFlow(
-  {
-    name: 'preDiagnosisFlow',
-    inputSchema: PreDiagnosisInputSchema,
-    outputSchema: PreDiagnosisOutputSchema,
-  },
-  async input => {
-    if (!input.reasonForVisit.trim()) {
-        return { possibleConditions: [], suggestedActions: [] };
+  const preDiagnosisFlow = ai.defineFlow(
+    {
+      name: 'preDiagnosisFlow',
+      inputSchema: PreDiagnosisInputSchema,
+      outputSchema: PreDiagnosisOutputSchema,
+    },
+    async (flowInput) => {
+      if (!flowInput.reasonForVisit.trim()) {
+          return { possibleConditions: [], suggestedActions: [] };
+      }
+      const {output} = await prompt(flowInput);
+      return output!;
     }
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+  );
+
+  return preDiagnosisFlow(input);
+}

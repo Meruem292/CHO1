@@ -29,14 +29,11 @@ const HealthSuggestionsOutputSchema = z.object({
 export type HealthSuggestionsOutput = z.infer<typeof HealthSuggestionsOutputSchema>;
 
 export async function getHealthSuggestions(input: HealthSuggestionsInput): Promise<HealthSuggestionsOutput> {
-  return healthSuggestionsFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'healthSuggestionsPrompt',
-  input: {schema: HealthSuggestionsInputSchema},
-  output: {schema: HealthSuggestionsOutputSchema},
-  prompt: `You are an AI assistant providing health suggestions based on medical records.
+  const prompt = ai.definePrompt({
+    name: 'healthSuggestionsPrompt',
+    input: {schema: HealthSuggestionsInputSchema},
+    output: {schema: HealthSuggestionsOutputSchema},
+    prompt: `You are an AI assistant providing health suggestions based on medical records.
 
   Based on the following information, provide a list of potential health interventions and the rationale behind each suggestion.
 
@@ -46,16 +43,19 @@ const prompt = ai.definePrompt({
 
   Format your response as a JSON array of objects, each with an "intervention" and "rationale" field.
   `,
-});
+  });
 
-const healthSuggestionsFlow = ai.defineFlow(
-  {
-    name: 'healthSuggestionsFlow',
-    inputSchema: HealthSuggestionsInputSchema,
-    outputSchema: HealthSuggestionsOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+  const healthSuggestionsFlow = ai.defineFlow(
+    {
+      name: 'healthSuggestionsFlow',
+      inputSchema: HealthSuggestionsInputSchema,
+      outputSchema: HealthSuggestionsOutputSchema,
+    },
+    async (flowInput) => {
+      const {output} = await prompt(flowInput);
+      return output!;
+    }
+  );
+
+  return healthSuggestionsFlow(input);
+}
