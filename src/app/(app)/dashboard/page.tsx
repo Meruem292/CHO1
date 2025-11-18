@@ -8,7 +8,7 @@ import { useMockDb } from "@/hooks/use-mock-db";
 import { Users, ClipboardList, Baby, HeartPulse, Loader2, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import type { Patient } from '@/types';
-import { AdminDashboard } from '@/components/admin-dashboard'; // New component for admin
+import { AdminDashboard } from '@/components/admin-dashboard';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -16,19 +16,15 @@ export default function DashboardPage() {
     patients, patientsLoading,
     consultations, consultationsLoading, getConsultationsByPatientId,
     maternityRecords, maternityRecordsLoading, getMaternityHistoryByPatientId,
-    babyRecords: patientBabyRecords, babyRecordsLoading: patientBabyRecordsLoading, getBabyRecordsByMotherId, // Renamed for clarity
-    allAppointmentsForAdmin, getAllAppointments, allAppointmentsLoading, // For Admin
-    // Note: We are not fetching *all* baby records for the admin dashboard in this iteration due to complexity.
-    // The "Born Kids" stat would require a new global fetch in useMockDb or backend aggregation.
+    babyRecords: patientBabyRecords, babyRecordsLoading: patientBabyRecordsLoading, getBabyRecordsByMotherId,
+    allAppointmentsForAdmin, getAllAppointments, allAppointmentsLoading,
   } = useMockDb();
 
-  // States for patient-specific data (if user is patient)
   const [myConsultationsCount, setMyConsultationsCount] = useState(0);
   const [myMaternityRecordsCount, setMyMaternityRecordsCount] = useState(0);
   const [myBabyRecordsCount, setMyBabyRecordsCount] = useState(0);
   const [isPatientDataLoading, setIsPatientDataLoading] = useState(true);
 
-  // Effect for admin data fetching
   useEffect(() => {
     let unsubAppointments: (() => void) | undefined;
     if (user?.role === 'admin') {
@@ -39,7 +35,6 @@ export default function DashboardPage() {
     };
   }, [user?.role, getAllAppointments]);
   
-  // Effect for patient-specific data fetching
   useEffect(() => {
     let unsubscribeConsultations: (() => void) | undefined;
     let unsubscribeMaternity: (() => void) | undefined;
@@ -61,7 +56,6 @@ export default function DashboardPage() {
     };
   }, [user, getConsultationsByPatientId, getMaternityHistoryByPatientId, getBabyRecordsByMotherId]);
 
-  // Effect for updating patient-specific counts
  useEffect(() => {
     if (user?.role === 'patient') {
         if (!consultationsLoading) setMyConsultationsCount(consultations.length);
@@ -74,13 +68,12 @@ export default function DashboardPage() {
     }
   }, [user?.role, consultations, consultationsLoading, maternityRecords, maternityRecordsLoading, patientBabyRecords, patientBabyRecordsLoading]);
 
-  // Overall loading state
   const isLoadingOverall = user?.role === 'admin'
     ? patientsLoading || allAppointmentsLoading 
     : (user?.role === 'patient' ? (patientsLoading || isPatientDataLoading) : patientsLoading);
 
 
-  if (isLoadingOverall && user) { // Show loader only if user is determined
+  if (isLoadingOverall && user) {
      return (
        <div className="flex flex-col items-center justify-center h-screen space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -89,7 +82,7 @@ export default function DashboardPage() {
     );
   }
   
-  if (!user) { // Should be handled by layout, but as a fallback
+  if (!user) {
      return (
        <div className="flex flex-col items-center justify-center h-screen space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -98,7 +91,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Admin Dashboard
   if (user.role === 'admin') {
     return (
        <div className="space-y-6">
@@ -112,7 +104,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Patient/Doctor/Midwife Dashboard
   const isProvider = user.role === 'doctor' || user.role === 'midwife/nurse';
   const totalPatientsInSystem = patients.filter((p: Patient) => p.role === 'patient').length; 
   
@@ -122,7 +113,6 @@ export default function DashboardPage() {
     { title: "My Baby's Records", value: myBabyRecordsCount, icon: HeartPulse, href: `/patients/${user.id}/baby-health`, loading: patientBabyRecordsLoading },
   ] : isProvider ? [
     { title: "Total Patients in System", value: totalPatientsInSystem, icon: Users, href: "/patients", loading: patientsLoading },
-    // More provider-specific stats could be added here if needed
   ] : [];
 
   return (
@@ -152,7 +142,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {user.role !== 'admin' && ( // Quick actions for non-admins
+      {user.role !== 'admin' && (
          <Card>
             <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>

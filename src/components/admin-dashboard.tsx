@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Patient, Appointment } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { DatePickerWithRange } from '@/components/ui/date-range-picker'; // Assume this exists or we'll create it
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { addDays, format, isAfter, isBefore, isFuture, parseISO, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { Users, Stethoscope, CalendarClock, CheckCircle, XCircle, TrendingUp, BarChart3, PieChart as PieIcon, Filter, Loader2, AlertTriangle } from 'lucide-react';
@@ -229,5 +229,3 @@ function NoDataAlert({ type }: {type: string}) {
         </div>
     );
 }
-
-    
