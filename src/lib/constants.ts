@@ -17,7 +17,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     roles: ['admin', 'doctor', 'midwife/nurse', 'patient'],
   },
-  // Admin Specific
+  // Admin Specific - Reordered for better workflow
+  {
+    href: '/admin/appointments', // Admin manages all appointments
+    label: 'Manage Appointments',
+    icon: CalendarClock,
+    roles: ['admin'],
+  },
   {
     href: '/patients', // Admin views/manages all patients (role='patient')
     label: 'Manage Patients',
@@ -31,33 +37,33 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['admin'],
   },
   {
-    href: '/user-management', // Admin manages all users (any role)
-    label: 'User Management',
-    icon: UserCog,
-    roles: ['admin'],
-  },
-  {
-    href: '/admin/appointments', // Admin manages all appointments
-    label: 'Manage Appointments',
-    icon: CalendarClock,
-    roles: ['admin'],
-  },
-  {
     href: '/admin/schedules', // Admin views all provider schedules
     label: 'Provider Schedules',
     icon: BriefcaseMedical,
     roles: ['admin'],
   },
   {
-    href: '/admin/archive',
-    label: 'Archive',
-    icon: Archive,
-    roles: ['admin'],
+    href: '/ai-suggestions',
+    label: 'AI Health Suggestions',
+    icon: Sparkles,
+    roles: ['admin', 'doctor', 'midwife/nurse'],
   },
-   {
+  /* { // Example of a hidden item
+    href: '/user-management', // Admin manages all users (any role)
+    label: 'User Management',
+    icon: UserCog,
+    roles: ['admin'],
+  }, */
+  {
     href: '/audit-log',
     label: 'Audit Log',
     icon: ListOrdered,
+    roles: ['admin'],
+  },
+  {
+    href: '/admin/archive',
+    label: 'Archive',
+    icon: Archive,
     roles: ['admin'],
   },
   {
@@ -91,12 +97,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: History,
     roles: ['doctor', 'midwife/nurse'],
   },
-   {
-    href: '/ai-suggestions',
-    label: 'AI Health Suggestions',
-    icon: Sparkles,
-    roles: ['admin', 'doctor', 'midwife/nurse'],
-  },
   // Patient Specific
   {
     href: '/patient/my-appointments', // Patient views their own appointments (redirects)
@@ -128,7 +128,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/baby-health',
-    label: 'My Baby\'s Health',
+    label: "My Baby's Health",
     icon: HeartPulse,
     roles: ['patient'],
     patientSpecific: true,
