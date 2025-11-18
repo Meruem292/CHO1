@@ -2,7 +2,7 @@
 
 'use client';
 
-import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole, DayOfWeek, AuditLogAction, BmiRecord } from '@/types';
+import type { Patient, ConsultationRecord, MaternityRecord, BabyRecord, DoctorSchedule, Appointment, AppointmentStatus, UserRole, DayOfWeek, AuditLogAction, BmiRecord, PreDiagnosisOutput } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '@/lib/firebase-config';
 import { ref, onValue, set, push, update as firebaseUpdate, remove as firebaseRemove, child, serverTimestamp, query, orderByChild, equalTo, get } from 'firebase/database';
@@ -25,6 +25,7 @@ import {
   compareAsc
 } from 'date-fns';
 import { createAuditLog } from './use-audit';
+import { getPreDiagnosis } from '@/ai/flows/pre-diagnosis';
 
 
 // Helper to transform Firebase snapshot to array
@@ -515,17 +516,28 @@ export function useMockDb() {
     const patientRec = patients.find(p => p.id === appointmentData.patientId);
     const doctorRec = patients.find(p => p.id === appointmentData.doctorId);
 
+    let preDiagnosis: PreDiagnosisOutput | undefined = undefined;
+    if (appointmentData.reasonForVisit) {
+        try {
+            preDiagnosis = await getPreDiagnosis({ reasonForVisit: appointmentData.reasonForVisit });
+        } catch (aiError) {
+            console.error("AI pre-diagnosis failed:", aiError);
+            // Don't block appointment creation if AI fails
+        }
+    }
+
     const dataToSave: Omit<Appointment, 'id'> = {
       ...appointmentData,
       patientName: patientRec?.name || 'Unknown Patient',
       doctorName: doctorRec?.name || 'Unknown Provider',
+      preDiagnosis: preDiagnosis,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
     const newId = newAppointmentRef.key!;
     await set(newAppointmentRef, dataToSave);
-    await createAuditLog(user, 'appointment_booked', `Booked appointment for ${dataToSave.patientName} with ${dataToSave.doctorName}`, newId, 'appointment');
+    await createAuditLog(user, 'appointment_booked', `Booked appointment for ${dataToSave.patientName} with ${dataToSave.doctorName}`, newId, 'appointment', { preDiagnosis: preDiagnosis });
     return { ...dataToSave, id: newId } as Appointment;
   }, [patients, user]); 
 

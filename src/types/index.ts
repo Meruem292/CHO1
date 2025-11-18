@@ -154,6 +154,11 @@ export type AppointmentStatus =
   | 'cancelledByProvider' // More generic for doctor or midwife
   | 'rescheduled';
 
+export interface PreDiagnosisOutput {
+    possibleConditions: string[];
+    suggestedActions: string[];
+}
+
 export interface Appointment {
   id: string;
   patientId: string;
@@ -165,6 +170,7 @@ export interface Appointment {
   durationMinutes: number;
   status: AppointmentStatus;
   reasonForVisit?: string;
+  preDiagnosis?: PreDiagnosisOutput;
   notes?: string; // Doctor/Admin notes
   cancellationReason?: string;
   cancelledByRole?: UserRole;
@@ -211,6 +217,7 @@ export type AuditLogAction =
   | 'appointment_booked'
   | 'appointment_cancelled'
   | 'appointment_completed'
+  | 'appointment_pre_diagnosis_generated'
   | 'schedule_updated'
   | 'record_restored'
   | 'record_permanently_deleted';

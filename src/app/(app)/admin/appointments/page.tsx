@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth-hook';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, Loader2, CalendarX2, ShieldAlert, CircleSlash, CheckCircle, CalendarClock, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -56,11 +57,14 @@ export default function AdminManageAppointmentsPage() {
   const [cancellationReason, setCancellationReason] = useState('');
 
   useEffect(() => {
-    const unsubscribe = getAllAppointments();
+    let unsubscribe: (() => void) | undefined;
+    if (currentUser?.role === 'admin') {
+      unsubscribe = getAllAppointments();
+    }
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [getAllAppointments]);
+  }, [currentUser, getAllAppointments]);
 
   const handleCancelConfirm = async () => {
     if (!appointmentToCancel || !currentUser) return;
@@ -104,7 +108,47 @@ export default function AdminManageAppointmentsPage() {
     {
       accessorKey: 'reasonForVisit',
       header: 'Reason',
-      cell: ({ row }) => <p className="truncate max-w-xs">{row.original?.reasonForVisit || 'N/A'}</p>,
+      cell: ({ row }) => {
+        const reason = row.original?.reasonForVisit;
+        const preDiagnosis = row.original?.preDiagnosis;
+        const hasPreDiagnosis = preDiagnosis && (preDiagnosis.possibleConditions?.length > 0 || preDiagnosis.suggestedActions?.length > 0);
+
+        return (
+          <div className="flex items-center space-x-2">
+            <p className="truncate max-w-xs">{reason || 'N/A'}</p>
+            {hasPreDiagnosis && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Sparkles className="h-4 w-4 text-primary cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-md p-4">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-foreground">AI Pre-Diagnosis</h4>
+                      {preDiagnosis.possibleConditions.length > 0 && (
+                        <div>
+                          <p className="font-medium text-sm">Possible Conditions:</p>
+                          <ul className="list-disc list-inside text-xs text-muted-foreground">
+                            {preDiagnosis.possibleConditions.map((c, i) => <li key={i}>{c}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                       {preDiagnosis.suggestedActions.length > 0 && (
+                        <div>
+                          <p className="font-medium text-sm">Suggested Actions:</p>
+                          <ul className="list-disc list-inside text-xs text-muted-foreground">
+                            {preDiagnosis.suggestedActions.map((a, i) => <li key={i}>{a}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'status',
