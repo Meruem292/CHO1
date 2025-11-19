@@ -517,7 +517,7 @@ export function useMockDb() {
     const doctorRec = patients.find(p => p.id === appointmentData.doctorId);
 
     let preDiagnosis: PreDiagnosisOutput | undefined = undefined;
-    if (appointmentData.reasonForVisit) {
+    if (appointmentData.reasonForVisit && appointmentData.reasonForVisit.trim()) {
         try {
             preDiagnosis = await getPreDiagnosis({ reasonForVisit: appointmentData.reasonForVisit });
         } catch (aiError) {
