@@ -530,7 +530,7 @@ export function useMockDb() {
       ...appointmentData,
       patientName: patientRec?.name || 'Unknown Patient',
       doctorName: doctorRec?.name || 'Unknown Provider',
-      preDiagnosis: preDiagnosis,
+      preDiagnosis: preDiagnosis || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
